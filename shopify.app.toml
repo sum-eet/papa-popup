@@ -3,30 +3,25 @@
 client_id = "5bcf826801b7097d7f0f87ea479e66f3"
 name = "papa-popup"
 handle = "papa-popup"
-application_url = "https://solve-perspective-studying-thunder.trycloudflare.com"
+application_url = "https://smartpop-revenue-engine.vercel.app/"
 embedded = true
 
 [build]
-include_config_on_deploy = true
 automatically_update_urls_on_dev = false
 
 [webhooks]
 api_version = "2025-07"
 
-  [[webhooks.subscriptions]]
-  topics = [ "app/uninstalled" ]
-  uri = "/webhooks/app/uninstalled"
-
-  [[webhooks.subscriptions]]
-  topics = [ "app/scopes_update" ]
-  uri = "/webhooks/app/scopes_update"
-
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products"
+scopes = "write_products,write_script_tags,read_script_tags"
 
 [auth]
-redirect_urls = ["https://solve-perspective-studying-thunder.trycloudflare.com/auth/callback", "https://solve-perspective-studying-thunder.trycloudflare.com/auth/shopify/callback", "https://solve-perspective-studying-thunder.trycloudflare.com/api/auth/callback"]
+redirect_urls = [
+  "https://smartpop-revenue-engine.vercel.app/auth/callback",
+  "https://smartpop-revenue-engine.vercel.app/auth/shopify/callback",
+  "https://smartpop-revenue-engine.vercel.app/api/auth/callback"
+]
 
 [pos]
 embedded = false
