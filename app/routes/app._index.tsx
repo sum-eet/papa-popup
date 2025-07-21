@@ -1,5 +1,6 @@
 import { type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, Form, useNavigation } from "@remix-run/react";
+import { useState } from "react";
 import {
   Page,
   Layout,
@@ -9,7 +10,8 @@ import {
   FormLayout,
   Badge,
   DataTable,
-  EmptyState
+  EmptyState,
+  Checkbox
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -33,40 +35,119 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const formData = await request.formData();
   
   const shop = await prisma.shop.findUnique({
-    where: { domain: session.shop }
+    where: { domain: session.shop },
+    include: { popupConfig: true }
   });
 
   if (!shop) throw new Error("Shop not found");
 
-  // Create or update popup config
-  await prisma.popupConfig.upsert({
-    where: { shopId: shop.id },
-    create: {
-      shopId: shop.id,
-      enabled: true,
-      headline: formData.get("headline") as string,
-      description: formData.get("description") as string,
-      buttonText: formData.get("buttonText") as string,
-    },
-    update: {
-      enabled: true,
-      headline: formData.get("headline") as string,
-      description: formData.get("description") as string,
-      buttonText: formData.get("buttonText") as string,
-    }
-  });
+  const isEnabled = formData.get("enabled") === "true";
+  const existingConfig = shop.popupConfig;
+  
+  try {
+    let scriptTagId: string | null = existingConfig?.scriptTagId || null;
 
-  return { success: true };
+    // Handle script tag creation/deletion
+    if (isEnabled && !existingConfig?.scriptTagId) {
+      // Create new script tag
+      const scriptTagResponse = await admin.graphql(`
+        #graphql
+        mutation scriptTagCreate($scriptTag: ScriptTagInput!) {
+          scriptTagCreate(scriptTag: $scriptTag) {
+            scriptTag {
+              id
+              src
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `, {
+        variables: {
+          scriptTag: {
+            src: `${process.env.SHOPIFY_APP_URL}/popup-loader.js`,
+            displayScope: "ONLINE_STORE"
+          }
+        }
+      });
+
+      const scriptTagResult = await scriptTagResponse.json();
+      
+      if (scriptTagResult.data?.scriptTagCreate?.scriptTag?.id) {
+        scriptTagId = scriptTagResult.data.scriptTagCreate.scriptTag.id.replace('gid://shopify/ScriptTag/', '');
+      } else if (scriptTagResult.data?.scriptTagCreate?.userErrors?.length > 0) {
+        throw new Error(`Script tag creation failed: ${scriptTagResult.data.scriptTagCreate.userErrors[0].message}`);
+      }
+    } else if (!isEnabled && existingConfig?.scriptTagId) {
+      // Delete existing script tag
+      const deleteResponse = await admin.graphql(`
+        #graphql
+        mutation scriptTagDelete($id: ID!) {
+          scriptTagDelete(id: $id) {
+            deletedScriptTagId
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `, {
+        variables: {
+          id: `gid://shopify/ScriptTag/${existingConfig.scriptTagId}`
+        }
+      });
+
+      const deleteResult = await deleteResponse.json();
+      
+      if (deleteResult.data?.scriptTagDelete?.deletedScriptTagId) {
+        scriptTagId = null;
+      } else if (deleteResult.data?.scriptTagDelete?.userErrors?.length > 0) {
+        console.warn(`Script tag deletion failed: ${deleteResult.data.scriptTagDelete.userErrors[0].message}`);
+        // Continue anyway - config will be updated
+      }
+    }
+
+    // Create or update popup config
+    await prisma.popupConfig.upsert({
+      where: { shopId: shop.id },
+      create: {
+        shopId: shop.id,
+        enabled: isEnabled,
+        headline: formData.get("headline") as string,
+        description: formData.get("description") as string,
+        buttonText: formData.get("buttonText") as string,
+        scriptTagId: scriptTagId,
+      },
+      update: {
+        enabled: isEnabled,
+        headline: formData.get("headline") as string,
+        description: formData.get("description") as string,
+        buttonText: formData.get("buttonText") as string,
+        scriptTagId: scriptTagId,
+      }
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Script tag operation failed:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to manage script tag" 
+    };
+  }
 }
 
 export default function Index() {
   const { shop } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
+  const [enabled, setEnabled] = useState(shop?.popupConfig?.enabled || false);
 
   const emailRows = shop?.emails.map(email => [
     email.email,
@@ -81,8 +162,10 @@ export default function Index() {
             <div style={{ padding: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <h2>Popup Configuration</h2>
-                {shop?.popupConfig?.enabled && (
+                {shop?.popupConfig?.enabled ? (
                   <Badge tone="success">Active</Badge>
+                ) : (
+                  <Badge tone="critical">Inactive</Badge>
                 )}
               </div>
             </div>
@@ -90,6 +173,13 @@ export default function Index() {
             <div style={{ padding: '20px' }}>
               <Form method="post">
                 <FormLayout>
+                  <Checkbox
+                    label="Enable Email Popup"
+                    checked={enabled}
+                    onChange={(checked) => setEnabled(checked)}
+                    helpText="When enabled, the popup will appear on your storefront"
+                  />
+                  
                   <TextField
                     label="Popup Headline"
                     name="headline"
@@ -116,8 +206,10 @@ export default function Index() {
                     onChange={() => {}}
                   />
                   
+                  <input type="hidden" name="enabled" value={enabled.toString()} />
+                  
                   <Button submit variant="primary" loading={isSubmitting}>
-                    {shop?.popupConfig ? "Update Popup" : "Enable Popup"}
+                    {enabled ? "Save & Enable Popup" : "Save Configuration"}
                   </Button>
                 </FormLayout>
               </Form>

@@ -1,14 +1,20 @@
-import { json, type ActionFunctionArgs } from "@remix-run/node";
+import { type ActionFunctionArgs } from "@remix-run/node";
 import prisma from "../db.server";
 
 // This endpoint will be hit by the popup
 export async function action({ request }: ActionFunctionArgs) {
   // Enable CORS for storefront
-  const headers = {
+  const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
+    "Content-Type": "application/json",
   };
+
+  // Handle preflight OPTIONS request
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 200, headers: corsHeaders });
+  }
 
   try {
     const data = await request.json();
@@ -20,7 +26,10 @@ export async function action({ request }: ActionFunctionArgs) {
     });
 
     if (!shop) {
-      return json({ error: "Shop not found" }, { status: 404, headers });
+      return new Response(
+        JSON.stringify({ error: "Shop not found" }),
+        { status: 404, headers: corsHeaders }
+      );
     }
 
     // Save email
@@ -32,22 +41,27 @@ export async function action({ request }: ActionFunctionArgs) {
       },
     });
 
-    return json({ success: true }, { headers });
+    return new Response(
+      JSON.stringify({ success: true }),
+      { status: 200, headers: corsHeaders }
+    );
   } catch (error) {
-    return json({ error: "Failed to save email" }, { status: 500, headers });
+    console.error("Email collection error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to save email" }),
+      { status: 500, headers: corsHeaders }
+    );
   }
 }
 
 // Handle preflight
 export async function loader() {
-  return json(
-    {},
-    {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST",
-        "Access-Control-Allow-Headers": "Content-Type",
-      },
+  return new Response(null, {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
     },
-  );
+  });
 }

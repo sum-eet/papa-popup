@@ -54,6 +54,7 @@ model PopupConfig {
   headline    String   @default("Get 10% Off!")
   description String   @default("Subscribe to our newsletter")
   buttonText  String   @default("Subscribe")
+  scriptTagId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
