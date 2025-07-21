@@ -6,11 +6,19 @@ import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 import { authenticate } from "../shopify.server";
+import prisma from "../db.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
+
+  // Create shop record after authentication
+  await prisma.shop.upsert({
+    where: { domain: session.shop },
+    update: {},
+    create: { domain: session.shop }
+  });
 
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
 };

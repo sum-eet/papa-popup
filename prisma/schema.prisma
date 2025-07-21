@@ -36,3 +36,36 @@ model Session {
   collaborator  Boolean?  @default(false)
   emailVerified Boolean?  @default(false)
 }
+
+model Shop {
+  id          String   @id @default(uuid())
+  domain      String   @unique
+  installedAt DateTime @default(now())
+
+  popupConfig PopupConfig?
+  emails      CollectedEmail[]
+}
+
+model PopupConfig {
+  id          String   @id @default(uuid())
+  shopId      String   @unique
+  shop        Shop     @relation(fields: [shopId], references: [id])
+  enabled     Boolean  @default(false)
+  headline    String   @default("Get 10% Off!")
+  description String   @default("Subscribe to our newsletter")
+  buttonText  String   @default("Subscribe")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CollectedEmail {
+  id        String   @id @default(uuid())
+  email     String
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id])
+  source    String   @default("popup")
+  createdAt DateTime @default(now())
+
+  @@index([shopId])
+  @@index([email])
+}
