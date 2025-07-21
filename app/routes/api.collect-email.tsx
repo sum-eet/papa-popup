@@ -1,5 +1,5 @@
 import { json, type ActionFunctionArgs } from "@remix-run/node";
-import { prisma } from "~/db.server";
+import prisma from "../db.server";
 
 // This endpoint will be hit by the popup
 export async function action({ request }: ActionFunctionArgs) {
