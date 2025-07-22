@@ -319,6 +319,22 @@ export default function Index() {
             </div>
           </Card>
         </Layout.Section>
+
+        <Layout.Section>
+          <Card>
+            <div style={{ padding: '20px' }}>
+              <h2>Advanced Tools</h2>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+                <Button url="/app/script-tags" variant="secondary">
+                  📋 Manage Script Tags
+                </Button>
+                <Button url="/app/check-token" variant="secondary">
+                  🔍 Debug Tokens
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </Layout.Section>
       </Layout>
     </Page>
   );

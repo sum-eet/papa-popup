@@ -403,5 +403,42 @@
     initPopup();
   }
 
+  // Add global helper functions for testing
+  window.clearPapaPopup = function() {
+    console.log('🧹 Clearing Papa Popup session data...');
+    sessionStorage.removeItem(POPUP_SHOWN_KEY);
+    sessionStorage.removeItem('smartpop_shown');
+    sessionStorage.removeItem('popup_shown');
+    console.log('✅ Papa Popup session data cleared! Reload page to test popup.');
+  };
+
+  window.testPapaPopup = function() {
+    console.log('🧪 Testing Papa Popup immediately...');
+    sessionStorage.removeItem(POPUP_SHOWN_KEY);
+    checkPopup();
+  };
+
+  window.debugPapaPopup = function() {
+    console.log('🔍 Papa Popup Debug Info:', {
+      scriptLoaded: window.papaPopupLoaded,
+      sessionStorage: {
+        papaPopupShown: sessionStorage.getItem(POPUP_SHOWN_KEY),
+        smartPopShown: sessionStorage.getItem('smartpop_shown'),
+        popupShown: sessionStorage.getItem('popup_shown'),
+      },
+      currentPage: {
+        url: window.location.href,
+        hostname: window.location.hostname,
+        pathname: window.location.pathname,
+        pageType: getPageType()
+      },
+      appUrl: APP_URL
+    });
+  };
+
   console.log('🚀 Papa Popup: Loader script initialized successfully!');
+  console.log('💡 Papa Popup: Helper functions available:');
+  console.log('   - clearPapaPopup() - Clear session data');
+  console.log('   - testPapaPopup() - Test popup immediately');  
+  console.log('   - debugPapaPopup() - Show debug info');
 })();
