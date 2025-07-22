@@ -27,10 +27,12 @@
 
   // Check if popup should show
   async function checkPopup() {
+    console.log('🔍 Papa Popup: Starting popup check process...');
+    
     try {
       // Skip if already shown in this session
       if (sessionStorage.getItem(POPUP_SHOWN_KEY)) {
-        console.log('Papa Popup: Already shown in this session');
+        console.log('⏭️ Papa Popup: Already shown in this session, skipping');
         return;
       }
 
@@ -38,7 +40,15 @@
       const pageType = getPageType();
       const pageUrl = window.location.href;
 
-      console.log('Papa Popup: Checking if popup should show', { shopDomain, pageType });
+      console.log('📊 Papa Popup: Gathered page info:', { 
+        shopDomain, 
+        pageType, 
+        pageUrl,
+        userAgent: navigator.userAgent.substring(0, 50) + '...',
+        timestamp: new Date().toISOString()
+      });
+
+      console.log('🌐 Papa Popup: Making API request to:', `${APP_URL}/api/popup-check`);
 
       const response = await fetch(`${APP_URL}/api/popup-check`, {
         method: 'POST',
@@ -52,24 +62,46 @@
         })
       });
 
+      console.log('📡 Papa Popup: API response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
       if (!response.ok) {
-        console.log('Papa Popup: API check failed', response.status);
+        console.log('❌ Papa Popup: API check failed with status:', response.status);
+        const errorText = await response.text();
+        console.log('📄 Papa Popup: Error response body:', errorText);
         return;
       }
 
       const data = await response.json();
-      console.log('Papa Popup: API response', data);
+      console.log('📋 Papa Popup: API response data:', JSON.stringify(data, null, 2));
 
       if (data.showPopup && data.config) {
+        console.log('✅ Papa Popup: Should show popup with config:', data.config);
         renderPopup(data.config);
+      } else {
+        console.log('🚫 Papa Popup: Should NOT show popup', {
+          showPopup: data.showPopup,
+          hasConfig: !!data.config,
+          reason: data.reason || 'No reason provided'
+        });
       }
     } catch (error) {
-      console.log('Papa Popup: Check failed', error);
+      console.error('💥 Papa Popup: Check failed with error:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
     }
   }
 
   // Render the popup
   function renderPopup(config) {
+    console.log('🎨 Papa Popup: Starting popup render with config:', config);
+    
     try {
       const popupHTML = `
         <div id="papa-popup-overlay" style="
@@ -179,11 +211,19 @@
         </style>
       `;
 
+      console.log('📝 Papa Popup: Inserting HTML into DOM...');
       document.body.insertAdjacentHTML('beforeend', popupHTML);
+      
+      console.log('⚡ Papa Popup: Setting up event listeners...');
       setupPopupEvents(config);
-      console.log('Papa Popup: Rendered successfully');
+      
+      console.log('✅ Papa Popup: Rendered successfully and visible to user!');
     } catch (error) {
-      console.log('Papa Popup: Render failed', error);
+      console.error('💥 Papa Popup: Render failed with error:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
     }
   }
 
@@ -237,14 +277,16 @@
         submitBtn.disabled = true;
 
         try {
+          console.log('🚀 Papa Popup: Starting email submission process...');
           const success = await submitEmail(email);
           if (success) {
+            console.log('🎉 Papa Popup: Showing success message...');
             showSuccessMessage();
           } else {
             throw new Error('Submission failed');
           }
         } catch (error) {
-          console.log('Papa Popup: Email submission failed', error);
+          console.error('💥 Papa Popup: Form submission failed:', error);
           submitBtn.textContent = originalText;
           submitBtn.disabled = false;
           alert('Sorry, there was an error. Please try again.');
@@ -255,21 +297,46 @@
 
   // Submit email to collection endpoint
   async function submitEmail(email) {
+    console.log('📧 Papa Popup: Submitting email:', email, 'for shop:', window.location.hostname);
+    
     try {
+      const requestData = {
+        email: email,
+        shopDomain: window.location.hostname
+      };
+      
+      console.log('📤 Papa Popup: Sending request to:', `${APP_URL}/api/collect-email`);
+      console.log('📄 Papa Popup: Request payload:', requestData);
+      
       const response = await fetch(`${APP_URL}/api/collect-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          email: email,
-          shopDomain: window.location.hostname
-        })
+        body: JSON.stringify(requestData)
       });
+
+      console.log('📨 Papa Popup: Email submission response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('✅ Papa Popup: Email submitted successfully:', responseData);
+      } else {
+        const errorData = await response.text();
+        console.log('❌ Papa Popup: Email submission failed:', errorData);
+      }
 
       return response.ok;
     } catch (error) {
-      console.log('Papa Popup: Email submission error', error);
+      console.error('💥 Papa Popup: Email submission error:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       return false;
     }
   }
@@ -318,18 +385,23 @@
 
   // Wait for DOM ready and then check popup
   function initPopup() {
+    console.log('⏰ Papa Popup: DOM ready, waiting 2 seconds before checking popup...');
     // Wait 2 seconds after DOM ready for better UX
     setTimeout(() => {
+      console.log('⏰ Papa Popup: 2 second delay complete, starting popup check...');
       checkPopup();
     }, 2000);
   }
 
   // DOM ready detection
+  console.log('🔄 Papa Popup: Checking document ready state:', document.readyState);
   if (document.readyState === 'loading') {
+    console.log('⏳ Papa Popup: Document still loading, waiting for DOMContentLoaded...');
     document.addEventListener('DOMContentLoaded', initPopup);
   } else {
+    console.log('✅ Papa Popup: Document already ready, initializing immediately...');
     initPopup();
   }
 
-  console.log('Papa Popup: Loader initialized');
+  console.log('🚀 Papa Popup: Loader script initialized successfully!');
 })();
