@@ -70,10 +70,44 @@ export async function action({ request }: ActionFunctionArgs) {
   });
   
   try {
-    let scriptTagId: string | null = existingConfig?.scriptTagId || null;
+    let scriptTagId: string | null = null;
 
-    // Handle script tag creation/deletion
-    if (isEnabled && !existingConfig?.scriptTagId) {
+    // Always delete existing script tag first if it exists
+    if (existingConfig?.scriptTagId) {
+      console.log("🗑️ Deleting existing script tag first:", existingConfig.scriptTagId);
+      try {
+        const deleteResponse = await admin.graphql(`
+          #graphql
+          mutation scriptTagDelete($id: ID!) {
+            scriptTagDelete(id: $id) {
+              deletedScriptTagId
+              userErrors {
+                field
+                message
+              }
+            }
+          }
+        `, {
+          variables: {
+            id: `gid://shopify/ScriptTag/${existingConfig.scriptTagId}`
+          }
+        });
+
+        const deleteResult = await deleteResponse.json();
+        console.log("🗑️ Delete result:", JSON.stringify(deleteResult, null, 2));
+        
+        if (deleteResult.data?.scriptTagDelete?.deletedScriptTagId) {
+          console.log("✅ Old script tag deleted successfully");
+        } else {
+          console.warn("⚠️ Could not delete old script tag, continuing anyway");
+        }
+      } catch (error) {
+        console.warn("⚠️ Error deleting old script tag:", error);
+      }
+    }
+
+    // Create new script tag if popup is enabled
+    if (isEnabled) {
       console.log("🏗️ Creating new script tag...");
       // Create new script tag
       const scriptTagUrl = `${process.env.SHOPIFY_APP_URL}/popup-loader.js`;
@@ -116,41 +150,6 @@ export async function action({ request }: ActionFunctionArgs) {
         console.log("⚠️ Unexpected script tag response:", scriptTagResult);
         throw new Error("Script tag creation failed: Unexpected response");
       }
-    } else if (!isEnabled && existingConfig?.scriptTagId) {
-      console.log("🗑️ Deleting existing script tag...");
-      // Delete existing script tag
-      const deleteResponse = await admin.graphql(`
-        #graphql
-        mutation scriptTagDelete($id: ID!) {
-          scriptTagDelete(id: $id) {
-            deletedScriptTagId
-            userErrors {
-              field
-              message
-            }
-          }
-        }
-      `, {
-        variables: {
-          id: `gid://shopify/ScriptTag/${existingConfig.scriptTagId}`
-        }
-      });
-
-      const deleteResult = await deleteResponse.json();
-      console.log("🗑️ Script tag deletion response:", JSON.stringify(deleteResult, null, 2));
-      
-      if (deleteResult.data?.scriptTagDelete?.deletedScriptTagId) {
-        scriptTagId = null;
-        console.log("✅ Script tag deleted successfully");
-      } else if (deleteResult.data?.scriptTagDelete?.userErrors?.length > 0) {
-        console.warn("⚠️ Script tag deletion failed:", deleteResult.data.scriptTagDelete.userErrors[0].message);
-        // Continue anyway - config will be updated
-      }
-    } else {
-      console.log("⏭️ No script tag operations needed", { 
-        isEnabled, 
-        hasExistingScriptTag: !!existingConfig?.scriptTagId 
-      });
     }
 
     // Create or update popup config
@@ -210,6 +209,11 @@ export default function Index() {
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const [enabled, setEnabled] = useState(shop?.popupConfig?.enabled || false);
+  
+  // Form state for editable fields
+  const [headline, setHeadline] = useState(shop?.popupConfig?.headline || "Get 10% Off!");
+  const [description, setDescription] = useState(shop?.popupConfig?.description || "Subscribe to our newsletter for exclusive deals");
+  const [buttonText, setButtonText] = useState(shop?.popupConfig?.buttonText || "Subscribe");
 
   const emailRows = shop?.emails.map(email => [
     email.email,
@@ -240,12 +244,10 @@ export default function Index() {
           <Card>
             <div style={{ padding: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <h2>Popup Configuration</h2>
-                {shop?.popupConfig?.enabled ? (
-                  <Badge tone="success">Active</Badge>
-                ) : (
-                  <Badge tone="critical">Inactive</Badge>
-                )}
+                <h2>Create New Popup</h2>
+                <div style={{ fontSize: '14px', color: '#666' }}>
+                  {shop?.popupConfig?.scriptTagId ? `Current Script: ${shop.popupConfig.scriptTagId}` : 'No active script'}
+                </div>
               </div>
             </div>
             
@@ -262,27 +264,29 @@ export default function Index() {
                   <TextField
                     label="Popup Headline"
                     name="headline"
-                    value={shop?.popupConfig?.headline || "Get 10% Off!"}
+                    value={headline}
                     autoComplete="off"
                     helpText="This is the main headline visitors will see"
-                    onChange={() => {}}
+                    onChange={(value) => setHeadline(value)}
                   />
                   
                   <TextField
                     label="Description"
                     name="description"
-                    value={shop?.popupConfig?.description || "Subscribe to our newsletter for exclusive deals"}
+                    value={description}
                     autoComplete="off"
                     multiline
-                    onChange={() => {}}
+                    helpText="Describe your offer or newsletter benefits"
+                    onChange={(value) => setDescription(value)}
                   />
                   
                   <TextField
                     label="Button Text"
                     name="buttonText"
-                    value={shop?.popupConfig?.buttonText || "Subscribe"}
+                    value={buttonText}
                     autoComplete="off"
-                    onChange={() => {}}
+                    helpText="Call-to-action text (e.g., Subscribe, Get Discount)"
+                    onChange={(value) => setButtonText(value)}
                   />
                   
                   <input type="hidden" name="enabled" value={enabled.toString()} />
@@ -292,6 +296,54 @@ export default function Index() {
                   </Button>
                 </FormLayout>
               </Form>
+            </div>
+          </Card>
+        </Layout.Section>
+
+        <Layout.Section>
+          <Card>
+            <div style={{ padding: '20px' }}>
+              <h2>Current Popup Configuration</h2>
+            </div>
+            <div style={{ padding: '20px' }}>
+              {shop?.popupConfig ? (
+                <div style={{ 
+                  border: '1px solid #e1e5e9', 
+                  borderRadius: '8px', 
+                  padding: '15px',
+                  backgroundColor: shop.popupConfig.enabled ? '#f0f9ff' : '#fff5f5'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Badge tone={shop.popupConfig.enabled ? "success" : "critical"}>
+                        {shop.popupConfig.enabled ? "Active" : "Inactive"}
+                      </Badge>
+                      <span style={{ fontSize: '14px', color: '#666' }}>
+                        ID: {shop.popupConfig.id}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#666' }}>
+                      Script: {shop.popupConfig.scriptTagId || 'None'}
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: '8px' }}>
+                    <strong>Headline:</strong> {shop.popupConfig.headline}
+                  </div>
+                  <div style={{ marginBottom: '8px' }}>
+                    <strong>Description:</strong> {shop.popupConfig.description}
+                  </div>
+                  <div>
+                    <strong>Button Text:</strong> {shop.popupConfig.buttonText}
+                  </div>
+                </div>
+              ) : (
+                <EmptyState
+                  heading="No popup configuration found"
+                  image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                >
+                  <p>Create your first popup using the form above</p>
+                </EmptyState>
+              )}
             </div>
           </Card>
         </Layout.Section>
