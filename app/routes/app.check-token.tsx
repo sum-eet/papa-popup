@@ -47,8 +47,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     try {
       const createResponse = await admin.graphql(`
         #graphql
-        mutation scriptTagCreate($scriptTag: ScriptTagInput!) {
-          scriptTagCreate(scriptTag: $scriptTag) {
+        mutation scriptTagCreate($input: ScriptTagInput!) {
+          scriptTagCreate(input: $input) {
             scriptTag {
               id
               src
@@ -61,7 +61,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         }
       `, {
         variables: {
-          scriptTag: {
+          input: {
             src: "https://test.com/test.js",
             displayScope: "ONLINE_STORE"
           }

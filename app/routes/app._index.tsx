@@ -81,8 +81,8 @@ export async function action({ request }: ActionFunctionArgs) {
       
       const scriptTagResponse = await admin.graphql(`
         #graphql
-        mutation scriptTagCreate($scriptTag: ScriptTagInput!) {
-          scriptTagCreate(scriptTag: $scriptTag) {
+        mutation scriptTagCreate($input: ScriptTagInput!) {
+          scriptTagCreate(input: $input) {
             scriptTag {
               id
               src
@@ -95,7 +95,7 @@ export async function action({ request }: ActionFunctionArgs) {
         }
       `, {
         variables: {
-          scriptTag: {
+          input: {
             src: scriptTagUrl,
             displayScope: "ONLINE_STORE"
           }
