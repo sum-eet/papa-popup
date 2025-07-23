@@ -42,8 +42,13 @@ model Shop {
   domain      String   @unique
   installedAt DateTime @default(now())
 
+  // Legacy single popup (keep for backwards compatibility)
   popupConfig PopupConfig?
   emails      CollectedEmail[]
+  
+  // New multi-popup system
+  popups          Popup[]
+  customerSessions CustomerSession[]
 }
 
 model PopupConfig {
@@ -67,6 +72,149 @@ model CollectedEmail {
   source    String   @default("popup")
   createdAt DateTime @default(now())
 
+  // Link to new session system
+  customerSessionId String?
+  customerSession   CustomerSession? @relation(fields: [customerSessionId], references: [id])
+  
+  // Which popup collected this
+  popupId           String?
+  
+  // Quiz data
+  quizResponses     Json?    // Copy of session responses
+  discountUsed      String?  // Which discount they got
+
   @@index([shopId])
   @@index([email])
+  @@index([customerSessionId])
+}
+
+// NEW MULTI-POPUP SYSTEM MODELS
+
+model Popup {
+  id              String   @id @default(uuid())
+  shopId          String
+  shop            Shop     @relation(fields: [shopId], references: [id])
+  
+  // Basic info
+  name            String
+  status          PopupStatus @default(DRAFT)
+  priority        Int      @default(1)
+  
+  // Targeting
+  targetingRules  Json     @default("{}") // {"pages": ["all"], "specific": []}
+  
+  // Configuration
+  popupType       PopupType @default(SIMPLE_EMAIL)
+  totalSteps      Int      @default(1)
+  
+  // Discount configuration
+  discountType    DiscountType @default(FIXED)
+  discountConfig  Json     @default("{}")
+  
+  // Email requirement
+  emailRequired   Boolean  @default(true)
+  emailStep       Int?     // Which step shows email form
+  
+  // Content
+  steps           PopupStep[]
+  sessions        CustomerSession[]
+  
+  // Tracking
+  scriptTagId     String?
+  
+  // Soft delete
+  isDeleted       Boolean  @default(false)
+  deletedAt       DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([shopId, status])
+  @@index([shopId, priority])
+  @@index([shopId, isDeleted])
+}
+
+model PopupStep {
+  id              String   @id @default(uuid())
+  popupId         String
+  popup           Popup    @relation(fields: [popupId], references: [id])
+  
+  stepNumber      Int
+  stepType        StepType
+  
+  // Content based on type
+  content         Json     @default("{}")
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([popupId, stepNumber])
+  @@index([popupId])
+}
+
+model CustomerSession {
+  id              String   @id @default(uuid())
+  sessionToken    String   @unique
+  shopId          String
+  shop            Shop     @relation(fields: [shopId], references: [id])
+  
+  // Current popup interaction
+  popupId         String?
+  popup           Popup?   @relation(fields: [popupId], references: [id])
+  currentStep     Int      @default(1)
+  
+  // Progress
+  stepsViewed     Int      @default(0)
+  stepsCompleted  Int      @default(0)
+  emailProvided   Boolean  @default(false)
+  
+  // Responses stored as JSON for flexibility
+  responses       Json?    // [{"stepNumber": 1, "answer": "dry"}, ...]
+  
+  // Discount earned
+  discountCode    String?
+  discountAmount  String?
+  
+  // Metadata
+  ipAddress       String?
+  userAgent       String?
+  pageUrl         String?
+  
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+  completedAt     DateTime?
+  
+  collectedEmails CollectedEmail[]
+  
+  @@index([sessionToken])
+  @@index([shopId, createdAt])
+  @@index([popupId])
+}
+
+// ENUMS
+enum PopupStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  DELETED
+}
+
+enum PopupType {
+  SIMPLE_EMAIL      // Just email capture
+  DIRECT_DISCOUNT   // Show discount immediately
+  QUIZ_EMAIL        // Quiz then email
+  QUIZ_DISCOUNT     // Quiz then discount
+}
+
+enum StepType {
+  QUESTION
+  EMAIL
+  DISCOUNT_REVEAL
+  CONTENT          // Just informational
+}
+
+enum DiscountType {
+  FIXED           // Same discount for everyone
+  LOGIC_BASED     // Based on quiz completion
+  RANDOMIZED      // Random selection
 }

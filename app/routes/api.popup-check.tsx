@@ -1,6 +1,136 @@
 import { type ActionFunctionArgs } from "@remix-run/node";
 import prisma from "../db.server";
 
+// Legacy popup system handler
+async function handleLegacyPopupCheck(shopDomain: string, pageType: string, pageUrl: string, corsHeaders: Record<string, string>) {
+  console.log("🔄 Using legacy popup system for:", shopDomain);
+  
+  // Find shop and popup config
+  const shop = await prisma.shop.findUnique({
+    where: { domain: shopDomain },
+    include: { popupConfig: true }
+  });
+
+  if (!shop || !shop.popupConfig || !shop.popupConfig.enabled) {
+    return new Response(
+      JSON.stringify({ showPopup: false, reason: "No active legacy popup" }),
+      { status: 200, headers: corsHeaders }
+    );
+  }
+
+  // Simple logic: show on home and product pages
+  const showOnPages = ['home', 'product', 'collection'];
+  const shouldShow = showOnPages.includes(pageType);
+
+  if (!shouldShow) {
+    return new Response(
+      JSON.stringify({ showPopup: false, reason: `Page type ${pageType} not targeted` }),
+      { status: 200, headers: corsHeaders }
+    );
+  }
+
+  // Return popup config
+  const config = {
+    headline: shop.popupConfig.headline,
+    description: shop.popupConfig.description,
+    buttonText: shop.popupConfig.buttonText,
+    popupType: 'SIMPLE_EMAIL',
+    totalSteps: 1,
+    system: 'legacy'
+  };
+
+  return new Response(
+    JSON.stringify({
+      showPopup: true,
+      config,
+      pageType,
+      system: 'legacy'
+    }),
+    { status: 200, headers: corsHeaders }
+  );
+}
+
+// New multi-popup system handler  
+async function handleMultiPopupCheck(shopDomain: string, pageType: string, pageUrl: string, corsHeaders: Record<string, string>) {
+  console.log("🚀 Using multi-popup system for:", shopDomain);
+  
+  // Find shop and active popups
+  const shop = await prisma.shop.findUnique({
+    where: { domain: shopDomain },
+    include: { 
+      popups: {
+        where: {
+          status: 'ACTIVE',
+          isDeleted: false
+        },
+        include: {
+          steps: {
+            orderBy: { stepNumber: 'asc' }
+          }
+        },
+        orderBy: { priority: 'desc' } // Higher priority first
+      }
+    }
+  });
+
+  if (!shop || !shop.popups.length) {
+    return new Response(
+      JSON.stringify({ showPopup: false, reason: "No active multi-popups" }),
+      { status: 200, headers: corsHeaders }
+    );
+  }
+
+  // Find the highest priority popup that matches the current page
+  let selectedPopup = null;
+  
+  for (const popup of shop.popups) {
+    const targetingRules = typeof popup.targetingRules === 'string' 
+      ? JSON.parse(popup.targetingRules) 
+      : popup.targetingRules;
+    
+    const targetPages = targetingRules.pages || ['all'];
+    
+    if (targetPages.includes('all') || targetPages.includes(pageType)) {
+      selectedPopup = popup;
+      break; // Take the first (highest priority) match
+    }
+  }
+
+  if (!selectedPopup) {
+    return new Response(
+      JSON.stringify({ showPopup: false, reason: `No popup targets page type: ${pageType}` }),
+      { status: 200, headers: corsHeaders }
+    );
+  }
+
+  // Build config based on popup type and steps
+  const config = {
+    popupId: selectedPopup.id,
+    popupType: selectedPopup.popupType,
+    totalSteps: selectedPopup.totalSteps,
+    steps: selectedPopup.steps.map(step => ({
+      stepNumber: step.stepNumber,
+      stepType: step.stepType,
+      content: typeof step.content === 'string' ? JSON.parse(step.content) : step.content
+    })),
+    discountType: selectedPopup.discountType,
+    discountConfig: typeof selectedPopup.discountConfig === 'string' 
+      ? JSON.parse(selectedPopup.discountConfig) 
+      : selectedPopup.discountConfig,
+    system: 'multi'
+  };
+
+  return new Response(
+    JSON.stringify({
+      showPopup: true,
+      config,
+      pageType,
+      system: 'multi'
+    }),
+    { status: 200, headers: corsHeaders }
+  );
+}
+
 export async function action({ request }: ActionFunctionArgs) {
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -24,45 +154,14 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
-    // Find shop and popup config
-    const shop = await prisma.shop.findUnique({
-      where: { domain: shopDomain },
-      include: { popupConfig: true }
-    });
-
-    if (!shop || !shop.popupConfig || !shop.popupConfig.enabled) {
-      return new Response(
-        JSON.stringify({ showPopup: false }),
-        { status: 200, headers: corsHeaders }
-      );
+    // Check feature flag to determine which system to use
+    const useMultiPopup = process.env.ENABLE_MULTI_POPUP === 'true';
+    
+    if (useMultiPopup) {
+      return await handleMultiPopupCheck(shopDomain, pageType, pageUrl, corsHeaders);
+    } else {
+      return await handleLegacyPopupCheck(shopDomain, pageType, pageUrl, corsHeaders);
     }
-
-    // Simple logic: show on home and product pages
-    const showOnPages = ['home', 'product', 'collection'];
-    const shouldShow = showOnPages.includes(pageType);
-
-    if (!shouldShow) {
-      return new Response(
-        JSON.stringify({ showPopup: false }),
-        { status: 200, headers: corsHeaders }
-      );
-    }
-
-    // Return popup config
-    const config = {
-      headline: shop.popupConfig.headline,
-      description: shop.popupConfig.description,
-      buttonText: shop.popupConfig.buttonText,
-    };
-
-    return new Response(
-      JSON.stringify({
-        showPopup: true,
-        config,
-        pageType,
-      }),
-      { status: 200, headers: corsHeaders }
-    );
 
   } catch (error) {
     console.error("Popup check error:", error);
