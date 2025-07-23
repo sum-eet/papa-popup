@@ -36,6 +36,37 @@
     return 'other';
   }
 
+  // Convert multi-popup config to legacy format for fallback
+  function convertMultiToLegacyConfig(multiConfig) {
+    console.log('🔄 Papa Popup: Converting multi-popup config to legacy format');
+    
+    if (!multiConfig || !multiConfig.steps || multiConfig.steps.length === 0) {
+      return {
+        headline: 'Subscribe to our newsletter',
+        description: 'Get exclusive deals and updates',
+        buttonText: 'Subscribe'
+      };
+    }
+
+    // Find the first EMAIL step or use fallback
+    const emailStep = multiConfig.steps.find(step => step.stepType === 'EMAIL');
+    
+    if (emailStep && emailStep.content) {
+      return {
+        headline: emailStep.content.headline || 'Subscribe to our newsletter',
+        description: emailStep.content.description || 'Get exclusive deals and updates',
+        buttonText: emailStep.content.buttonText || 'Subscribe'
+      };
+    }
+
+    // Fallback if no email step found
+    return {
+      headline: 'Complete our quiz!',
+      description: 'Help us understand your preferences',
+      buttonText: 'Get Started'
+    };
+  }
+
   // Try to fetch multi-popup directly (bypass feature flag)
   async function tryFetchMultiPopup() {
     console.log('🎯 Papa Popup: Checking for active multi-popups...');
@@ -197,7 +228,10 @@
 
     } catch (error) {
       console.error('💥 Papa Popup: Multi-step initialization failed:', error);
-      renderLegacyPopup(config);
+      
+      // Convert multi-popup config to legacy format for fallback
+      const legacyConfig = convertMultiToLegacyConfig(config);
+      renderLegacyPopup(legacyConfig);
     }
   }
 

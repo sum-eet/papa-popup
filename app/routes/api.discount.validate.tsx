@@ -10,8 +10,8 @@ const corsHeaders = {
 };
 
 export async function loader() {
-  return new Response("Method not allowed", { 
-    status: 405,
+  return new Response(null, { 
+    status: 200,
     headers: corsHeaders
   });
 }
