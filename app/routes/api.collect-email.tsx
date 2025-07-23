@@ -1,5 +1,6 @@
 import { type ActionFunctionArgs } from "@remix-run/node";
 import prisma from "../db.server";
+import { isMultiPopupEnabled } from "../utils/features";
 
 // This endpoint will be hit by the popup
 export async function action({ request }: ActionFunctionArgs) {
@@ -18,7 +19,24 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     const data = await request.json();
-    const { email, shopDomain } = data;
+    const { 
+      email, 
+      shopDomain, 
+      sessionToken, 
+      quizResponses, 
+      popupId,
+      source = "popup" 
+    } = data;
+
+    if (!email || !shopDomain) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Email and shop domain are required" 
+        }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
 
     // Find shop
     const shop = await prisma.shop.findUnique({
@@ -27,28 +45,96 @@ export async function action({ request }: ActionFunctionArgs) {
 
     if (!shop) {
       return new Response(
-        JSON.stringify({ error: "Shop not found" }),
+        JSON.stringify({ 
+          success: false, 
+          error: "Shop not found" 
+        }),
         { status: 404, headers: corsHeaders }
       );
     }
 
-    // Save email
-    await prisma.collectedEmail.create({
+    let customerSessionId = null;
+    let discountCode = null;
+
+    // Handle multi-popup system with session tracking
+    if (isMultiPopupEnabled() && sessionToken) {
+      // Find and update customer session
+      const customerSession = await prisma.customerSession.findFirst({
+        where: {
+          sessionToken,
+          shopId: shop.id,
+          expiresAt: {
+            gt: new Date()
+          }
+        },
+        include: {
+          popup: true
+        }
+      });
+
+      if (customerSession) {
+        customerSessionId = customerSession.id;
+
+        // Mark session as completed with email
+        await prisma.customerSession.update({
+          where: { id: customerSession.id },
+          data: {
+            completedAt: new Date()
+          }
+        });
+
+        // Generate discount code if popup type requires it
+        if (customerSession.popup && customerSession.popup.popupType === 'QUIZ_DISCOUNT') {
+          // Simple discount code generation - can be enhanced later
+          discountCode = `QUIZ${Date.now().toString().slice(-6)}`;
+          
+          // Update session with discount code
+          await prisma.customerSession.update({
+            where: { id: customerSession.id },
+            data: {
+              discountCode
+            }
+          });
+        }
+
+        console.log(`[Email Collection] Session ${sessionToken} marked as completed with email`);
+      }
+    }
+
+    // Prepare quiz responses data
+    const quizData = quizResponses || {};
+    
+    // Save email with enhanced data
+    const collectedEmail = await prisma.collectedEmail.create({
       data: {
         email,
         shopId: shop.id,
-        source: "popup",
+        customerSessionId,
+        source,
+        quizResponses: Object.keys(quizData).length > 0 ? JSON.stringify(quizData) : undefined,
+        popupId: popupId || null,
       },
     });
 
+    console.log(`[Email Collection] Saved email ${email} for shop ${shopDomain}${sessionToken ? ` with session ${sessionToken}` : ''}`);
+
+    const response = {
+      success: true,
+      id: collectedEmail.id,
+      discountCode: discountCode || undefined
+    };
+
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify(response),
       { status: 200, headers: corsHeaders }
     );
   } catch (error) {
     console.error("Email collection error:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to save email" }),
+      JSON.stringify({ 
+        success: false, 
+        error: "Failed to save email" 
+      }),
       { status: 500, headers: corsHeaders }
     );
   }
