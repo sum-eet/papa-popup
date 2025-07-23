@@ -44,15 +44,16 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     // Only create sessions for multi-popup system
-    if (!isMultiPopupEnabled()) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Multi-popup system not enabled" 
-        }),
-        { status: 400, headers: corsHeaders }
-      );
-    }
+    // HARDCODED FOR TESTING - bypassing feature flag check
+    // if (!isMultiPopupEnabled()) {
+    //   return new Response(
+    //     JSON.stringify({ 
+    //       success: false, 
+    //       error: "Multi-popup system not enabled" 
+    //     }),
+    //     { status: 400, headers: corsHeaders }
+    //   );
+    // }
 
     // Find the shop
     const shop = await prisma.shop.findUnique({

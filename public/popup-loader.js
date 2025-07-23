@@ -38,9 +38,10 @@
 
   // Convert multi-popup config to legacy format for fallback
   function convertMultiToLegacyConfig(multiConfig) {
-    console.log('🔄 Papa Popup: Converting multi-popup config to legacy format');
+    console.log('🔄 Papa Popup: Converting multi-popup config to legacy format', multiConfig);
     
     if (!multiConfig || !multiConfig.steps || multiConfig.steps.length === 0) {
+      console.log('⚠️ Papa Popup: No config or steps found, using default fallback');
       return {
         headline: 'Subscribe to our newsletter',
         description: 'Get exclusive deals and updates',
@@ -50,16 +51,20 @@
 
     // Find the first EMAIL step or use fallback
     const emailStep = multiConfig.steps.find(step => step.stepType === 'EMAIL');
+    console.log('📧 Papa Popup: Found email step:', emailStep);
     
     if (emailStep && emailStep.content) {
-      return {
+      const result = {
         headline: emailStep.content.headline || 'Subscribe to our newsletter',
         description: emailStep.content.description || 'Get exclusive deals and updates',
         buttonText: emailStep.content.buttonText || 'Subscribe'
       };
+      console.log('✅ Papa Popup: Legacy config conversion result:', result);
+      return result;
     }
 
     // Fallback if no email step found
+    console.log('⚠️ Papa Popup: No email step found, using quiz fallback');
     return {
       headline: 'Complete our quiz!',
       description: 'Help us understand your preferences',
