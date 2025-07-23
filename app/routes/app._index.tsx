@@ -12,27 +12,109 @@ import {
   DataTable,
   EmptyState,
   Checkbox,
-  Banner
+  Banner,
+  Grid,
+  Text,
+  Divider
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { isMultiPopupEnabled } from "../utils/features";
+import type { PopupStatsResponse, Popup, CollectedEmail } from "../types/popup";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
+  const useMultiPopup = isMultiPopupEnabled();
   
-  // Get shop and popup config
-  const shop = await prisma.shop.findUnique({
-    where: { domain: session.shop },
-    include: {
-      popupConfig: true,
-      emails: {
-        take: 10,
-        orderBy: { createdAt: 'desc' }
+  if (useMultiPopup) {
+    // Multi-popup system data
+    const shop = await prisma.shop.findUnique({
+      where: { domain: session.shop },
+      include: {
+        popups: {
+          where: { isDeleted: false },
+          include: {
+            steps: {
+              orderBy: { stepNumber: 'asc' }
+            }
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: 5 // Recent popups for dashboard
+        },
+        emails: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            customerSession: {
+              select: {
+                popupId: true,
+                popup: {
+                  select: { name: true }
+                }
+              }
+            }
+          }
+        },
+        // Legacy popup config for migration reference
+        popupConfig: true
       }
-    }
-  });
+    });
 
-  return { shop };
+    if (!shop) {
+      throw new Error("Shop not found");
+    }
+
+    // Calculate stats
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const emailsToday = await prisma.collectedEmail.count({
+      where: {
+        shopId: shop.id,
+        createdAt: { gte: today }
+      }
+    });
+
+    const activePopups = shop.popups.filter(p => p.status === 'ACTIVE').length;
+    const topPerformingPopup = shop.popups.length > 0 ? shop.popups[0] : null;
+
+    const stats: PopupStatsResponse = {
+      totalPopups: shop.popups.length,
+      activePopups,
+      draftPopups: shop.popups.filter(p => p.status === 'DRAFT').length,
+      emailsCollectedToday: emailsToday,
+      emailsCollectedTotal: shop.emails.length,
+      topPerformingPopup: topPerformingPopup ? {
+        id: topPerformingPopup.id,
+        name: topPerformingPopup.name,
+        emailsCollected: 0 // TODO: Calculate actual emails from this popup
+      } : undefined
+    };
+
+    return { 
+      system: 'multi' as const,
+      shop, 
+      stats,
+      activePopup: shop.popups.find(p => p.status === 'ACTIVE') || null
+    };
+  } else {
+    // Legacy single popup system
+    const shop = await prisma.shop.findUnique({
+      where: { domain: session.shop },
+      include: {
+        popupConfig: true,
+        emails: {
+          take: 10,
+          orderBy: { createdAt: 'desc' }
+        }
+      }
+    });
+
+    return { 
+      system: 'legacy' as const,
+      shop 
+    };
+  }
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -204,9 +286,22 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Index() {
-  const { shop } = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
+  
+  // Conditional rendering based on system type
+  if (data.system === 'multi') {
+    return <MultiPopupDashboard data={data} actionData={actionData} />;
+  } else {
+    return <LegacyPopupDashboard data={data} actionData={actionData} navigation={navigation} />;
+  }
+}
+
+// Legacy dashboard component (existing functionality)
+function LegacyPopupDashboard({ data, actionData, navigation }: any) {
+  const { shop } = data;
   const isSubmitting = navigation.state === "submitting";
   const [enabled, setEnabled] = useState(shop?.popupConfig?.enabled || false);
   
@@ -382,6 +477,231 @@ export default function Index() {
                 </Button>
                 <Button url="/app/check-token" variant="secondary">
                   🔍 Debug Tokens
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </Layout.Section>
+      </Layout>
+    </Page>
+  );
+}
+
+// New multi-popup dashboard component
+function MultiPopupDashboard({ data, actionData }: any) {
+  const { shop, stats, activePopup } = data;
+
+  // Prepare email rows with popup attribution
+  const emailRows = shop?.emails.map((email: any) => [
+    email.email,
+    email.customerSession?.popup?.name || 'Legacy Popup',
+    new Date(email.createdAt).toLocaleDateString(),
+    email.discountUsed || 'None'
+  ]) || [];
+
+  return (
+    <Page 
+      title="Papa Popup Dashboard" 
+      primaryAction={{
+        content: 'Create New Popup',
+        url: '/app/popups/new',
+        variant: 'primary'
+      }}
+      secondaryActions={[
+        { content: 'Manage All Popups', url: '/app/popups' },
+        { content: 'View Analytics', url: '/app/analytics' }
+      ]}
+    >
+      <Layout>
+        {actionData && (
+          <Layout.Section>
+            {actionData.success ? (
+              <Banner status="success">
+                <p>✅ {actionData.message}</p>
+              </Banner>
+            ) : (
+              <Banner status="critical">
+                <p>❌ Error: {actionData.error}</p>
+              </Banner>
+            )}
+          </Layout.Section>
+        )}
+
+        {/* Stats Cards */}
+        <Layout.Section>
+          <Grid>
+            <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+              <Card>
+                <div style={{ padding: '20px', textAlign: 'center' }}>
+                  <Text variant="headingLg" as="h3">{stats.totalPopups}</Text>
+                  <Text variant="bodyMd" as="p" tone="subdued">Total Popups</Text>
+                </div>
+              </Card>
+            </Grid.Cell>
+            
+            <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+              <Card>
+                <div style={{ padding: '20px', textAlign: 'center' }}>
+                  <Text variant="headingLg" as="h3" tone="success">{stats.activePopups}</Text>
+                  <Text variant="bodyMd" as="p" tone="subdued">Active Popups</Text>
+                </div>
+              </Card>
+            </Grid.Cell>
+            
+            <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+              <Card>
+                <div style={{ padding: '20px', textAlign: 'center' }}>
+                  <Text variant="headingLg" as="h3">{stats.emailsCollectedToday}</Text>
+                  <Text variant="bodyMd" as="p" tone="subdued">Emails Today</Text>
+                </div>
+              </Card>
+            </Grid.Cell>
+            
+            <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+              <Card>
+                <div style={{ padding: '20px', textAlign: 'center' }}>
+                  <Text variant="headingLg" as="h3">{stats.emailsCollectedTotal}</Text>
+                  <Text variant="bodyMd" as="p" tone="subdued">Total Emails</Text>
+                </div>
+              </Card>
+            </Grid.Cell>
+          </Grid>
+        </Layout.Section>
+
+        {/* Active Popup Card */}
+        {activePopup && (
+          <Layout.Section>
+            <Card>
+              <div style={{ padding: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
+                  <div>
+                    <Text variant="headingMd" as="h2">Currently Active Popup</Text>
+                    <Text variant="bodyMd" as="p" tone="subdued">This popup is currently showing to visitors</Text>
+                  </div>
+                  <Badge tone="success">Active</Badge>
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <Text variant="headingMd" as="h3">{activePopup.name}</Text>
+                    <Text variant="bodyMd" as="p" tone="subdued">
+                      {activePopup.popupType.replace('_', ' ').toLowerCase()} • {activePopup.totalSteps} step{activePopup.totalSteps !== 1 ? 's' : ''}
+                    </Text>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <Button url={`/app/popups/${activePopup.id}/edit`}>Edit</Button>
+                    <Button variant="secondary">Pause</Button>
+                    <Button variant="secondary" url={`/app/popups/${activePopup.id}/preview`}>Preview</Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </Layout.Section>
+        )}
+
+        {/* Recent Popups */}
+        <Layout.Section>
+          <Card>
+            <div style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
+                <Text variant="headingMd" as="h2">Recent Popups</Text>
+                <Button url="/app/popups" variant="secondary">View All</Button>
+              </div>
+              
+              {shop.popups.length > 0 ? (
+                <div>
+                  {shop.popups.slice(0, 3).map((popup: any) => (
+                    <div key={popup.id} style={{ 
+                      padding: '12px 0', 
+                      borderBottom: '1px solid #e1e5e9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <div>
+                        <Text variant="bodyMd" as="p">{popup.name}</Text>
+                        <Text variant="bodySm" as="p" tone="subdued">
+                          {popup.status.toLowerCase()} • Updated {new Date(popup.updatedAt).toLocaleDateString()}
+                        </Text>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <Badge tone={popup.status === 'ACTIVE' ? 'success' : popup.status === 'DRAFT' ? 'attention' : 'subdued'}>
+                          {popup.status.toLowerCase()}
+                        </Badge>
+                        <Button size="micro" url={`/app/popups/${popup.id}/edit`}>Edit</Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  heading="No popups created yet"
+                  image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                >
+                  <p>Create your first popup to start collecting emails and boosting conversions</p>
+                  <div style={{ marginTop: '15px' }}>
+                    <Button variant="primary" url="/app/popups/new">Create Your First Popup</Button>
+                  </div>
+                </EmptyState>
+              )}
+            </div>
+          </Card>
+        </Layout.Section>
+
+        {/* Email Collection with Attribution */}
+        <Layout.Section>
+          <Card>
+            <div style={{ padding: '20px' }}>
+              <Text variant="headingMd" as="h2">Recent Email Submissions</Text>
+            </div>
+            <div style={{ padding: '20px' }}>
+              {emailRows.length > 0 ? (
+                <DataTable
+                  columnContentTypes={['text', 'text', 'text', 'text']}
+                  headings={['Email', 'Source Popup', 'Date', 'Discount Used']}
+                  rows={emailRows}
+                />
+              ) : (
+                <EmptyState
+                  heading="No emails collected yet"
+                  image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                >
+                  <p>Emails will appear here once visitors start subscribing through your popups</p>
+                </EmptyState>
+              )}
+            </div>
+          </Card>
+        </Layout.Section>
+
+        {/* Feature Migration Banner */}
+        {shop.popupConfig && (
+          <Layout.Section>
+            <Banner status="info">
+              <p>
+                <strong>🆕 New Multi-Popup System Active!</strong> Your previous popup has been migrated and is ready to use. 
+                You can now create multiple popups with advanced quiz functionality.
+              </p>
+            </Banner>
+          </Layout.Section>
+        )}
+
+        {/* Advanced Tools */}
+        <Layout.Section>
+          <Card>
+            <div style={{ padding: '20px' }}>
+              <Text variant="headingMd" as="h2">Advanced Tools</Text>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '15px', flexWrap: 'wrap' }}>
+                <Button url="/app/script-tags" variant="secondary">
+                  📋 Manage Script Tags
+                </Button>
+                <Button url="/app/check-token" variant="secondary">
+                  🔍 Debug Tokens  
+                </Button>
+                <Button url="/app/analytics" variant="secondary">
+                  📊 View Analytics
+                </Button>
+                <Button url="/app/popups/templates" variant="secondary">
+                  🎨 Popup Templates
                 </Button>
               </div>
             </div>
