@@ -36,6 +36,50 @@
     return 'other';
   }
 
+  // Try to fetch multi-popup directly (bypass feature flag)
+  async function tryFetchMultiPopup() {
+    console.log('🎯 Papa Popup: Checking for active multi-popups...');
+    
+    try {
+      const shopDomain = window.location.hostname;
+      const pageType = getPageType();
+      
+      // Direct call to get active popups (this will work even with ENABLE_MULTI_POPUP=false)
+      const response = await fetch(`${APP_URL}/api/popup-check`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          shopDomain,
+          pageType,
+          pageUrl: window.location.href,
+          forceMultiCheck: true // Signal to try multi-popup even if flag is off
+        })
+      });
+
+      if (!response.ok) {
+        console.log('📊 Papa Popup: Multi-popup check failed, will try legacy');
+        return null;
+      }
+
+      const data = await response.json();
+      
+      // Check if we got a multi-popup response
+      if (data.showPopup && data.config && data.config.popupType && data.config.popupType !== 'SIMPLE_EMAIL') {
+        console.log('✅ Papa Popup: Found multi-step popup:', data.config.popupType);
+        return data.config;
+      }
+      
+      console.log('📊 Papa Popup: No multi-step popups found, will use legacy');
+      return null;
+      
+    } catch (error) {
+      console.log('📊 Papa Popup: Multi-popup check error:', error);
+      return null;
+    }
+  }
+
   // Check if popup should show
   async function checkPopup() {
     console.log('🔍 Papa Popup: Starting popup check process...');
@@ -59,7 +103,17 @@
         timestamp: new Date().toISOString()
       });
 
-      console.log('🌐 Papa Popup: Making API request to:', `${APP_URL}/api/popup-check`);
+      // Step 1: Try to find active multi-popups first
+      const multiPopupConfig = await tryFetchMultiPopup();
+      
+      if (multiPopupConfig) {
+        console.log('🎯 Papa Popup: Using multi-step popup system');
+        await initializeMultiStepPopup(multiPopupConfig);
+        return;
+      }
+
+      // Step 2: Fall back to legacy system
+      console.log('🌐 Papa Popup: Falling back to legacy popup check');
 
       const response = await fetch(`${APP_URL}/api/popup-check`, {
         method: 'POST',
@@ -73,31 +127,25 @@
         })
       });
 
-      console.log('📡 Papa Popup: API response received:', {
+      console.log('📡 Papa Popup: Legacy API response received:', {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok
       });
 
       if (!response.ok) {
-        console.log('❌ Papa Popup: API check failed with status:', response.status);
+        console.log('❌ Papa Popup: Legacy API check failed with status:', response.status);
         return;
       }
 
       const data = await response.json();
-      console.log('📋 Papa Popup: API response data:', JSON.stringify(data, null, 2));
+      console.log('📋 Papa Popup: Legacy API response data:', JSON.stringify(data, null, 2));
 
       if (data.showPopup && data.config) {
-        console.log('✅ Papa Popup: Should show popup with config:', data.config);
-        
-        // Check if this is a multi-step popup
-        if (data.config.popupType && data.config.popupType !== 'SIMPLE_EMAIL') {
-          await initializeMultiStepPopup(data.config);
-        } else {
-          renderLegacyPopup(data.config);
-        }
+        console.log('✅ Papa Popup: Using legacy popup');
+        renderLegacyPopup(data.config);
       } else {
-        console.log('🚫 Papa Popup: Should NOT show popup');
+        console.log('🚫 Papa Popup: No popup to show');
       }
     } catch (error) {
       console.error('💥 Papa Popup: Check failed with error:', error);

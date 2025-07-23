@@ -145,7 +145,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   try {
-    const { shopDomain, pageType, pageUrl } = await request.json();
+    const { shopDomain, pageType, pageUrl, forceMultiCheck } = await request.json();
 
     if (!shopDomain) {
       return new Response(
@@ -155,10 +155,25 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     // Check feature flag to determine which system to use
-    const useMultiPopup = process.env.ENABLE_MULTI_POPUP === 'true';
+    const useMultiPopup = process.env.ENABLE_MULTI_POPUP === 'true' || forceMultiCheck;
     
     if (useMultiPopup) {
-      return await handleMultiPopupCheck(shopDomain, pageType, pageUrl, corsHeaders);
+      // Try multi-popup system first (even if feature flag is off via forceMultiCheck)
+      const multiResult = await handleMultiPopupCheck(shopDomain, pageType, pageUrl, corsHeaders);
+      
+      // If forceMultiCheck is true and no multi-popup found, still fall back to legacy
+      if (forceMultiCheck) {
+        const multiData = await multiResult.json();
+        if (multiData.showPopup) {
+          // Found a multi-popup, return it
+          return new Response(JSON.stringify(multiData), { status: 200, headers: corsHeaders });
+        } else {
+          // No multi-popup found, fall back to legacy
+          return await handleLegacyPopupCheck(shopDomain, pageType, pageUrl, corsHeaders);
+        }
+      } else {
+        return multiResult;
+      }
     } else {
       return await handleLegacyPopupCheck(shopDomain, pageType, pageUrl, corsHeaders);
     }
