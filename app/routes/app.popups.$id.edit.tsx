@@ -99,10 +99,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
           stepNumber: 1,
           stepType: 'EMAIL',
           content: JSON.stringify({
-            headline: formData.get("headline") || "Get 10% Off!",
-            description: formData.get("description") || "Subscribe to our newsletter",
+            headline: formData.get("headline") || "",
+            description: formData.get("description") || "",
             placeholder: "Enter your email",
-            buttonText: formData.get("buttonText") || "Subscribe"
+            buttonText: formData.get("buttonText") || ""
           })
         }
       });
@@ -144,10 +144,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
             stepNumber: totalSteps,
             stepType: 'EMAIL',
             content: JSON.stringify({
-              headline: "Thanks for taking our quiz!",
+              headline: formData.get("headline") || "",
               description: "Get your personalized recommendations",
               placeholder: "Enter your email",
-              buttonText: "Get My Results"
+              buttonText: formData.get("buttonText") || ""
             })
           }
         });
@@ -159,8 +159,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
             stepType: 'DISCOUNT_REVEAL',
             content: JSON.stringify({
               headline: "Here's your discount!",
-              description: "Thanks for taking our quiz",
-              codeDisplay: formData.get("discountCode") || "SAVE10",
+              description: formData.get("description") || "",
+              codeDisplay: formData.get("discountCode") || "",
               validityText: "Valid for 24 hours"
             })
           }

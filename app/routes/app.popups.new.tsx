@@ -80,10 +80,10 @@ export async function action({ request }: ActionFunctionArgs) {
           stepNumber: 1,
           stepType: 'EMAIL',
           content: JSON.stringify({
-            headline: formData.get("headline") || "Get 10% Off!",
-            description: formData.get("description") || "Subscribe to our newsletter",
+            headline: formData.get("headline") || "",
+            description: formData.get("description") || "",
             placeholder: "Enter your email",
-            buttonText: formData.get("buttonText") || "Subscribe"
+            buttonText: formData.get("buttonText") || ""
           })
         }
       });
@@ -110,7 +110,7 @@ export async function action({ request }: ActionFunctionArgs) {
             stepNumber: i,
             stepType: 'QUESTION',
             content: JSON.stringify({
-              question: question || `Question ${i}`,
+              question: question || "",
               options
             })
           }
@@ -125,10 +125,10 @@ export async function action({ request }: ActionFunctionArgs) {
             stepNumber: totalSteps,
             stepType: 'EMAIL',
             content: JSON.stringify({
-              headline: "Thanks for taking our quiz!",
-              description: "Get your personalized recommendations",
+              headline: formData.get("headline") || "",
+              description: formData.get("description") || "",
               placeholder: "Enter your email",
-              buttonText: "Get My Results"
+              buttonText: formData.get("buttonText") || ""
             })
           }
         });
@@ -139,10 +139,10 @@ export async function action({ request }: ActionFunctionArgs) {
             stepNumber: totalSteps,
             stepType: 'DISCOUNT_REVEAL',
             content: JSON.stringify({
-              headline: "Here's your discount!",
-              description: "Thanks for taking our quiz",
-              codeDisplay: formData.get("discountCode") || "SAVE10",
-              validityText: "Valid for 24 hours"
+              headline: formData.get("headline") || "",
+              description: formData.get("description") || "",
+              codeDisplay: formData.get("discountCode") || "",
+              validityText: formData.get("validityText") || ""
             })
           }
         });
