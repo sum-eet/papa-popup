@@ -120,15 +120,15 @@ export async function action({ request }: ActionFunctionArgs) {
       
       // Move to next step if not already there
       if (stepNumber >= newCurrentStep) {
-        newCurrentStep = Math.min(stepNumber + 1, customerSession.totalSteps);
+        newCurrentStep = Math.min(stepNumber + 1, customerSession.popup.totalSteps);
       }
     } else if (stepAction === 'navigate') {
       // Just update current step (for back/forward navigation)
-      newCurrentStep = Math.max(1, Math.min(stepNumber, customerSession.totalSteps));
+      newCurrentStep = Math.max(1, Math.min(stepNumber, customerSession.popup.totalSteps));
     } else if (stepAction === 'complete') {
       // Mark session as completed
       completedAt = new Date();
-      newCurrentStep = customerSession.totalSteps;
+      newCurrentStep = customerSession.popup.totalSteps;
     }
 
     // Update customer session
@@ -142,7 +142,7 @@ export async function action({ request }: ActionFunctionArgs) {
       }
     });
 
-    console.log(`[Session Progress] Updated session ${sessionToken}: step ${newCurrentStep}/${customerSession.totalSteps}, action: ${stepAction}`);
+    console.log(`[Session Progress] Updated session ${sessionToken}: step ${newCurrentStep}/${customerSession.popup.totalSteps}, action: ${stepAction}`);
 
     // Determine next step info
     const nextStep = customerSession.popup.steps.find(step => step.stepNumber === newCurrentStep);
@@ -157,7 +157,7 @@ export async function action({ request }: ActionFunctionArgs) {
         success: true,
         sessionToken: updatedSession.sessionToken,
         currentStep: newCurrentStep,
-        totalSteps: customerSession.totalSteps,
+        totalSteps: customerSession.popup.totalSteps,
         responses: updatedResponses,
         isCompleted: !!completedAt,
         nextStep: nextStep ? {
