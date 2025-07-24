@@ -122,7 +122,7 @@ export async function action({ request }: ActionFunctionArgs) {
         currentStep: customerSession.currentStep,
         totalSteps: customerSession.totalSteps,
         responses,
-        isCompleted: customerSession.isCompleted,
+        isCompleted: !!customerSession.completedAt,
         popup: {
           id: customerSession.popup.id,
           type: customerSession.popup.popupType,

@@ -111,7 +111,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     let updatedResponses = { ...currentResponses };
     let newCurrentStep = customerSession.currentStep;
-    let isCompleted = customerSession.isCompleted;
+    let completedAt = customerSession.completedAt;
 
     // Handle different step actions
     if (stepAction === 'answer' && stepResponse) {
@@ -127,7 +127,7 @@ export async function action({ request }: ActionFunctionArgs) {
       newCurrentStep = Math.max(1, Math.min(stepNumber, customerSession.totalSteps));
     } else if (stepAction === 'complete') {
       // Mark session as completed
-      isCompleted = true;
+      completedAt = new Date();
       newCurrentStep = customerSession.totalSteps;
     }
 
@@ -137,7 +137,7 @@ export async function action({ request }: ActionFunctionArgs) {
       data: {
         currentStep: newCurrentStep,
         responses: JSON.stringify(updatedResponses),
-        isCompleted,
+        completedAt,
         updatedAt: new Date()
       }
     });
@@ -159,7 +159,7 @@ export async function action({ request }: ActionFunctionArgs) {
         currentStep: newCurrentStep,
         totalSteps: customerSession.totalSteps,
         responses: updatedResponses,
-        isCompleted,
+        isCompleted: !!completedAt,
         nextStep: nextStep ? {
           stepNumber: nextStep.stepNumber,
           stepType: nextStep.stepType,
