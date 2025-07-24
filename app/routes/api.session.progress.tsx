@@ -137,8 +137,7 @@ export async function action({ request }: ActionFunctionArgs) {
       data: {
         currentStep: newCurrentStep,
         responses: JSON.stringify(updatedResponses),
-        completedAt,
-        updatedAt: new Date()
+        completedAt
       }
     });
 
@@ -171,12 +170,10 @@ export async function action({ request }: ActionFunctionArgs) {
 
   } catch (error) {
     console.error("[Session Progress] Error:", error);
-    console.error("[Session Progress] Error stack:", error.stack);
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: "Internal server error",
-        debug: error.message // Temporary debug info
+        error: "Internal server error"
       }),
       { status: 500, headers: corsHeaders }
     );
