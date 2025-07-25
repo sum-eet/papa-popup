@@ -115,8 +115,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
         const option3 = formData.get(`step_${i}_option_3`) as string;
 
         const options = [
-          { id: "1", text: option1 || "", value: "option1" },
-          { id: "2", text: option2 || "", value: "option2" }
+          { id: "1", text: option1 || "Option 1", value: "option1" },
+          { id: "2", text: option2 || "Option 2", value: "option2" }
         ];
 
         if (option3) {
