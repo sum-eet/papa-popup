@@ -1,7 +1,7 @@
 import { type ActionFunctionArgs } from "@remix-run/node";
-import { authenticate } from "../../shopify.server";
-import prisma from "../../db.server";
-import { isMultiPopupEnabled } from "../../utils/features";
+import { authenticate } from "../shopify.server";
+import prisma from "../db.server";
+import { isMultiPopupEnabled } from "../utils/features";
 
 export async function action({ request }: ActionFunctionArgs) {
   console.log("🚀 Papa Popup Delete API: Action started");
