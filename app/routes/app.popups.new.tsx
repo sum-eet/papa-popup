@@ -35,7 +35,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return redirect("/app");
   }
 
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const formData = await request.formData();
 
   try {
@@ -53,13 +53,64 @@ export async function action({ request }: ActionFunctionArgs) {
     const popupType = formData.get("popupType") as PopupType;
     const targetPages = formData.getAll("targetPages") as string[];
     const totalSteps = parseInt(formData.get("totalSteps") as string) || 1;
+    const createAsActive = formData.get("createAsActive") === "true";
+
+    console.log("🚀 Creating popup:", { name, popupType, totalSteps, createAsActive });
+
+    let scriptTagId: string | null = null;
+
+    // Create script tag if popup should be created as active
+    if (createAsActive) {
+      console.log("🏗️ Creating script tag for new active popup...");
+      
+      const scriptTagUrl = `${process.env.SHOPIFY_APP_URL}/popup-loader-enhanced.js`;
+      console.log("📜 Script tag URL:", scriptTagUrl);
+      
+      const scriptTagResponse = await admin.graphql(`
+        #graphql
+        mutation scriptTagCreate($input: ScriptTagInput!) {
+          scriptTagCreate(input: $input) {
+            scriptTag {
+              id
+              src
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `, {
+        variables: {
+          input: {
+            src: scriptTagUrl,
+            displayScope: "ONLINE_STORE"
+          }
+        }
+      });
+
+      const scriptTagResult = await scriptTagResponse.json();
+      console.log("📋 Script tag creation response:", JSON.stringify(scriptTagResult, null, 2));
+      
+      if (scriptTagResult.data?.scriptTagCreate?.scriptTag?.id) {
+        scriptTagId = scriptTagResult.data.scriptTagCreate.scriptTag.id.replace('gid://shopify/ScriptTag/', '');
+        console.log("✅ Script tag created successfully! ID:", scriptTagId);
+      } else if (scriptTagResult.data?.scriptTagCreate?.userErrors?.length > 0) {
+        const error = scriptTagResult.data.scriptTagCreate.userErrors[0];
+        console.log("❌ Script tag creation failed:", error);
+        return {
+          success: false,
+          error: `Script tag creation failed: ${error.message}`
+        };
+      }
+    }
 
     // Create popup
     const popup = await prisma.popup.create({
       data: {
         shopId: shop.id,
         name,
-        status: 'DRAFT',
+        status: createAsActive ? 'ACTIVE' : 'DRAFT',
         priority: 1,
         targetingRules: JSON.stringify({ pages: targetPages.length > 0 ? targetPages : ['all'] }),
         popupType,
@@ -67,7 +118,8 @@ export async function action({ request }: ActionFunctionArgs) {
         discountType: 'FIXED',
         discountConfig: JSON.stringify({}),
         emailRequired: true,
-        emailStep: totalSteps // Email is the last step
+        emailStep: totalSteps, // Email is the last step
+        scriptTagId: scriptTagId
       }
     });
 
@@ -149,7 +201,15 @@ export async function action({ request }: ActionFunctionArgs) {
       }
     }
 
-    return redirect(`/app/popups`);
+    console.log("✅ Popup created successfully:", {
+      id: popup.id,
+      name: popup.name,
+      status: popup.status,
+      scriptTagId: popup.scriptTagId
+    });
+
+    // Return success response with script tag info
+    return redirect(`/app/popups?created=${popup.id}&scriptTag=${scriptTagId || ''}`);
 
   } catch (error) {
     console.error("Popup creation error:", error);
@@ -184,6 +244,7 @@ export default function NewPopup() {
   const [popupType, setPopupType] = useState<PopupType>('SIMPLE_EMAIL');
   const [totalSteps, setTotalSteps] = useState(1);
   const [targetPages, setTargetPages] = useState<string[]>(['home']);
+  const [createAsActive, setCreateAsActive] = useState(false);
 
   const isQuizType = popupType === 'QUIZ_EMAIL' || popupType === 'QUIZ_DISCOUNT';
 
@@ -248,6 +309,13 @@ export default function NewPopup() {
                         ))}
                       </div>
                     </div>
+
+                    <Checkbox
+                      label="Create as Active"
+                      checked={createAsActive}
+                      onChange={setCreateAsActive}
+                      helpText="If checked, the popup will be created as ACTIVE with a script tag and will immediately show to customers"
+                    />
                   </FormLayout>
                 </div>
               </div>
@@ -358,13 +426,14 @@ export default function NewPopup() {
             {/* Submit */}
             <Card>
               <div style={{ padding: '20px' }}>
+                <input type="hidden" name="createAsActive" value={createAsActive.toString()} />
                 <ButtonGroup>
                   <Button
                     variant="primary"
                     submit
                     loading={isSubmitting}
                   >
-                    Create Popup
+                    {createAsActive ? 'Create Active Popup' : 'Create Popup'}
                   </Button>
                   <Button url="/app/popups">Cancel</Button>
                 </ButtonGroup>

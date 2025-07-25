@@ -1,5 +1,6 @@
 import { type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
+import { useState, useEffect } from "react";
 import { 
   Page, 
   Layout, 
@@ -67,8 +68,15 @@ export default function PopupsList() {
     );
   };
 
-  const handleDelete = (popupId: string) => {
-    if (confirm('Are you sure you want to delete this popup?')) {
+  const handleDelete = (popupId: string, popupName: string) => {
+    const popup = popups.find(p => p.id === popupId);
+    const isActive = popup?.status === 'ACTIVE';
+    
+    const confirmMessage = isActive 
+      ? `⚠️ "${popupName}" is currently ACTIVE and showing to customers. Deleting it will remove the popup from your store and delete its script tag. Are you sure you want to continue?`
+      : `Are you sure you want to delete "${popupName}"? This action cannot be undone.`;
+    
+    if (confirm(confirmMessage)) {
       fetcher.submit(
         { popupId },
         { method: 'DELETE', action: '/app/api/popups/delete' }
@@ -79,6 +87,24 @@ export default function PopupsList() {
   // Check if we have a successful action response
   const actionData = fetcher.data;
   const isLoading = fetcher.state === 'submitting';
+  const [showBanner, setShowBanner] = useState(true);
+
+  // Auto-hide success banner after 5 seconds
+  useEffect(() => {
+    if (actionData?.success && showBanner) {
+      const timer = setTimeout(() => {
+        setShowBanner(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [actionData?.success, showBanner]);
+
+  // Reset banner visibility when new action data arrives
+  useEffect(() => {
+    if (actionData) {
+      setShowBanner(true);
+    }
+  }, [actionData]);
 
   // Prepare table rows
   const tableRows = popups.map((popup: any) => [
@@ -127,6 +153,7 @@ export default function PopupsList() {
         size="micro"
         variant="secondary"
         url={`/app/popups/${popup.id}/edit`}
+        disabled={isLoading}
       >
         Edit
       </Button>
@@ -135,19 +162,36 @@ export default function PopupsList() {
         size="micro"
         variant="secondary"
         onClick={() => handleStatusToggle(popup.id, popup.status)}
-        loading={fetcher.state === 'submitting' && fetcher.formData?.get('popupId') === popup.id}
+        loading={isLoading && fetcher.formData?.get('popupId') === popup.id && fetcher.formData?.get('status')}
+        disabled={isLoading && fetcher.formData?.get('popupId') !== popup.id}
       >
-        {popup.status === 'ACTIVE' ? 'Pause' : 'Activate'}
+        {isLoading && fetcher.formData?.get('popupId') === popup.id && fetcher.formData?.get('status')
+          ? (fetcher.formData.get('status') === 'ACTIVE' ? 'Activating...' : 'Pausing...')
+          : (popup.status === 'ACTIVE' ? 'Pause' : 'Activate')
+        }
       </Button>
       
       <Button
         size="micro"
         variant="secondary"
         tone="critical"
-        onClick={() => handleDelete(popup.id)}
-        loading={fetcher.state === 'submitting' && fetcher.formData?.get('popupId') === popup.id}
+        onClick={() => handleDelete(popup.id, popup.name)}
+        loading={isLoading && fetcher.formData?.get('popupId') === popup.id && fetcher.method === 'DELETE'}
+        disabled={isLoading && !(fetcher.formData?.get('popupId') === popup.id && fetcher.method === 'DELETE')}
       >
-        Delete
+        {isLoading && fetcher.formData?.get('popupId') === popup.id && fetcher.method === 'DELETE'
+          ? 'Deleting...'
+          : 'Delete'
+        }
+      </Button>
+      
+      <Button
+        size="micro"
+        variant="secondary"
+        url={`/app/popups/${popup.id}/preview`}
+        disabled={isLoading}
+      >
+        Preview
       </Button>
     </div>
   ]);
@@ -167,17 +211,23 @@ export default function PopupsList() {
       }}
     >
       <Layout>
-        {actionData && (
+        {actionData && showBanner && (
           <Layout.Section>
             {actionData.success ? (
-              <Banner status="success">
+              <Banner 
+                status="success"
+                onDismiss={() => setShowBanner(false)}
+              >
                 <p>✅ {actionData.message}</p>
                 {actionData.popup?.scriptTagId && (
                   <p>Script tag created with ID: {actionData.popup.scriptTagId}</p>
                 )}
               </Banner>
             ) : (
-              <Banner status="critical">
+              <Banner 
+                status="critical"
+                onDismiss={() => setShowBanner(false)}
+              >
                 <p>❌ Error: {actionData.error}</p>
               </Banner>
             )}
