@@ -8,7 +8,8 @@ import {
   Button, 
   EmptyState,
   Badge,
-  Text
+  Text,
+  Banner
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -75,6 +76,10 @@ export default function PopupsList() {
     }
   };
 
+  // Check if we have a successful action response
+  const actionData = fetcher.data;
+  const isLoading = fetcher.state === 'submitting';
+
   // Prepare table rows
   const tableRows = popups.map((popup: any) => [
     <div key={`name-${popup.id}`}>
@@ -82,10 +87,22 @@ export default function PopupsList() {
       <Text variant="bodySm" as="p" tone="subdued">
         {popup.totalSteps} step{popup.totalSteps !== 1 ? 's' : ''} • 
         Created {new Date(popup.createdAt).toLocaleDateString()}
+        {popup.scriptTagId && (
+          <> • Script: {popup.scriptTagId}</>
+        )}
       </Text>
     </div>,
     
-    <PopupStatusBadge key={`status-${popup.id}`} status={popup.status} />,
+    <div key={`status-${popup.id}`}>
+      <PopupStatusBadge status={popup.status} />
+      {popup.status === 'ACTIVE' && popup.scriptTagId && (
+        <div style={{ marginTop: '4px' }}>
+          <Text variant="bodySm" as="p" tone="subdued">
+            Script Tag: {popup.scriptTagId}
+          </Text>
+        </div>
+      )}
+    </div>,
     
     <Text key={`type-${popup.id}`} variant="bodyMd" as="p">
       {popup.popupType.replace('_', ' ').toLowerCase()}
@@ -150,6 +167,23 @@ export default function PopupsList() {
       }}
     >
       <Layout>
+        {actionData && (
+          <Layout.Section>
+            {actionData.success ? (
+              <Banner status="success">
+                <p>✅ {actionData.message}</p>
+                {actionData.popup?.scriptTagId && (
+                  <p>Script tag created with ID: {actionData.popup.scriptTagId}</p>
+                )}
+              </Banner>
+            ) : (
+              <Banner status="critical">
+                <p>❌ Error: {actionData.error}</p>
+              </Banner>
+            )}
+          </Layout.Section>
+        )}
+        
         <Layout.Section>
           <Card>
             {popups.length > 0 ? (
