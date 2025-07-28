@@ -236,6 +236,23 @@ export default function EditPopup() {
 
   const isQuizType = popupType === 'QUIZ_EMAIL' || popupType === 'QUIZ_DISCOUNT';
   
+  // Get existing step data for form pre-population
+  const getStepContent = (stepNumber: number, field: string) => {
+    const step = popup.steps.find(s => s.stepNumber === stepNumber);
+    if (!step) return '';
+    
+    const content = typeof step.content === 'string' ? JSON.parse(step.content) : step.content;
+    return content[field] || '';
+  };
+
+  const getStepOption = (stepNumber: number, optionIndex: number) => {
+    const step = popup.steps.find(s => s.stepNumber === stepNumber);
+    if (!step) return '';
+    
+    const content = typeof step.content === 'string' ? JSON.parse(step.content) : step.content;
+    return content.options?.[optionIndex]?.text || '';
+  };
+  
   // Helper function to update quiz step
   const updateQuizStep = (stepIndex: number, field: string, value: string) => {
     setQuizSteps(prev => ({
@@ -262,23 +279,6 @@ export default function EditPopup() {
       return newSteps;
     });
   }, [totalSteps]);
-
-  // Get existing step data for form pre-population
-  const getStepContent = (stepNumber: number, field: string) => {
-    const step = popup.steps.find(s => s.stepNumber === stepNumber);
-    if (!step) return '';
-    
-    const content = typeof step.content === 'string' ? JSON.parse(step.content) : step.content;
-    return content[field] || '';
-  };
-
-  const getStepOption = (stepNumber: number, optionIndex: number) => {
-    const step = popup.steps.find(s => s.stepNumber === stepNumber);
-    if (!step) return '';
-    
-    const content = typeof step.content === 'string' ? JSON.parse(step.content) : step.content;
-    return content.options?.[optionIndex]?.text || '';
-  };
 
   return (
     <Page
