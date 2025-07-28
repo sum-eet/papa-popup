@@ -63,6 +63,56 @@ export async function action({ request }: ActionFunctionArgs) {
     if (createAsActive) {
       console.log("🏗️ Creating script tag for new active popup...");
       
+      // First, deactivate any existing active popups and clean up their script tags
+      const existingActivePopups = await prisma.popup.findMany({
+        where: {
+          shopId: shop.id,
+          status: 'ACTIVE',
+          isDeleted: false
+        }
+      });
+      
+      // Delete script tags for existing active popups
+      for (const popup of existingActivePopups) {
+        if (popup.scriptTagId) {
+          try {
+            console.log(`🗑️ Deleting script tag ${popup.scriptTagId} for popup ${popup.name}`);
+            await admin.graphql(`
+              #graphql
+              mutation scriptTagDelete($id: ID!) {
+                scriptTagDelete(id: $id) {
+                  deletedScriptTagId
+                  userErrors {
+                    field
+                    message
+                  }
+                }
+              }
+            `, {
+              variables: {
+                id: `gid://shopify/ScriptTag/${popup.scriptTagId}`
+              }
+            });
+          } catch (error) {
+            console.warn(`⚠️ Failed to delete script tag ${popup.scriptTagId}:`, error);
+          }
+        }
+      }
+      
+      // Deactivate existing active popups
+      await prisma.popup.updateMany({
+        where: {
+          shopId: shop.id,
+          status: 'ACTIVE',
+          isDeleted: false
+        },
+        data: {
+          status: 'PAUSED',
+          scriptTagId: null
+        }
+      });
+      console.log("✅ Deactivated existing active popups and cleaned up script tags");
+      
       const scriptTagUrl = `${process.env.SHOPIFY_APP_URL}/popup-loader-enhanced.js`;
       console.log("📜 Script tag URL:", scriptTagUrl);
       

@@ -210,8 +210,58 @@ export default function EditPopup() {
   const [popupType, setPopupType] = useState<PopupType>(popup.popupType);
   const [totalSteps, setTotalSteps] = useState(popup.totalSteps);
   const [targetPages, setTargetPages] = useState<string[]>(existingPages);
+  const [popupName, setPopupName] = useState(popup.name);
+  
+  // State for content fields
+  const [headline, setHeadline] = useState(getStepContent(1, 'headline'));
+  const [description, setDescription] = useState(getStepContent(1, 'description'));
+  const [buttonText, setButtonText] = useState(getStepContent(1, 'buttonText'));
+  
+  // State for quiz steps
+  const [quizSteps, setQuizSteps] = useState(() => {
+    const steps: any = {};
+    for (let i = 1; i < totalSteps; i++) {
+      steps[i] = {
+        question: getStepContent(i, 'question'),
+        option1: getStepOption(i, 0),
+        option2: getStepOption(i, 1),
+        option3: getStepOption(i, 2)
+      };
+    }
+    return steps;
+  });
+  
+  // State for discount code
+  const [discountCode, setDiscountCode] = useState(getStepContent(totalSteps, 'codeDisplay'));
 
   const isQuizType = popupType === 'QUIZ_EMAIL' || popupType === 'QUIZ_DISCOUNT';
+  
+  // Helper function to update quiz step
+  const updateQuizStep = (stepIndex: number, field: string, value: string) => {
+    setQuizSteps(prev => ({
+      ...prev,
+      [stepIndex]: {
+        ...prev[stepIndex],
+        [field]: value
+      }
+    }));
+  };
+  
+  // Update quiz steps when totalSteps changes
+  useEffect(() => {
+    setQuizSteps(prev => {
+      const newSteps: any = {};
+      for (let i = 1; i < totalSteps; i++) {
+        newSteps[i] = prev[i] || {
+          question: '',
+          option1: '',
+          option2: '',
+          option3: ''
+        };
+      }
+      return newSteps;
+    });
+  }, [totalSteps]);
 
   // Get existing step data for form pre-population
   const getStepContent = (stepNumber: number, field: string) => {
@@ -255,7 +305,8 @@ export default function EditPopup() {
                     <TextField
                       label="Popup Name"
                       name="name"
-                      value={popup.name}
+                      value={popupName}
+                      onChange={setPopupName}
                       placeholder="Summer Sale Popup"
                       helpText="Internal name to identify this popup"
                       autoComplete="off"
@@ -308,14 +359,16 @@ export default function EditPopup() {
                         <TextField
                           label="Headline"
                           name="headline"
-                          value={getStepContent(1, 'headline')}
+                          value={headline}
+                          onChange={setHeadline}
                           placeholder="Get 10% Off!"
                           autoComplete="off"
                         />
                         <TextField
                           label="Description"
                           name="description"
-                          value={getStepContent(1, 'description')}
+                          value={description}
+                          onChange={setDescription}
                           placeholder="Subscribe to our newsletter for exclusive deals"
                           multiline
                           autoComplete="off"
@@ -323,7 +376,8 @@ export default function EditPopup() {
                         <TextField
                           label="Button Text"
                           name="buttonText"
-                          value={getStepContent(1, 'buttonText')}
+                          value={buttonText}
+                          onChange={setButtonText}
                           placeholder="Subscribe"
                           autoComplete="off"
                         />
@@ -356,28 +410,32 @@ export default function EditPopup() {
                                   <TextField
                                     label="Question"
                                     name={`step_${i + 1}_question`}
-                                    value={getStepContent(i + 1, 'question')}
+                                    value={quizSteps[i + 1]?.question || ''}
+                                    onChange={(value) => updateQuizStep(i + 1, 'question', value)}
                                     placeholder={`What's your preference?`}
                                     autoComplete="off"
                                   />
                                   <TextField
                                     label="Option 1"
                                     name={`step_${i + 1}_option_1`}
-                                    value={getStepOption(i + 1, 0)}
+                                    value={quizSteps[i + 1]?.option1 || ''}
+                                    onChange={(value) => updateQuizStep(i + 1, 'option1', value)}
                                     placeholder="First option"
                                     autoComplete="off"
                                   />
                                   <TextField
                                     label="Option 2"
                                     name={`step_${i + 1}_option_2`}
-                                    value={getStepOption(i + 1, 1)}
+                                    value={quizSteps[i + 1]?.option2 || ''}
+                                    onChange={(value) => updateQuizStep(i + 1, 'option2', value)}
                                     placeholder="Second option"
                                     autoComplete="off"
                                   />
                                   <TextField
                                     label="Option 3 (optional)"
                                     name={`step_${i + 1}_option_3`}
-                                    value={getStepOption(i + 1, 2)}
+                                    value={quizSteps[i + 1]?.option3 || ''}
+                                    onChange={(value) => updateQuizStep(i + 1, 'option3', value)}
                                     placeholder="Third option"
                                     autoComplete="off"
                                   />
@@ -395,7 +453,8 @@ export default function EditPopup() {
                         <TextField
                           label="Discount Code"
                           name="discountCode"
-                          value={getStepContent(totalSteps, 'codeDisplay')}
+                          value={discountCode}
+                          onChange={setDiscountCode}
                           placeholder="SAVE10"
                           helpText="The discount code to reveal after the quiz"
                           autoComplete="off"

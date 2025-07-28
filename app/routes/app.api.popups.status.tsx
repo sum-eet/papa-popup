@@ -60,6 +60,60 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // Handle script tag management based on status change
     if (newStatus === "ACTIVE") {
+      // First, deactivate any other active popups (only one can be active at a time)
+      const existingActivePopups = await prisma.popup.findMany({
+        where: {
+          shopId: popup.shopId,
+          status: 'ACTIVE',
+          isDeleted: false,
+          id: { not: popupId } // Exclude current popup
+        }
+      });
+      
+      // Delete script tags for existing active popups
+      for (const activePopup of existingActivePopups) {
+        if (activePopup.scriptTagId) {
+          try {
+            console.log(`🗑️ Deleting script tag ${activePopup.scriptTagId} for popup ${activePopup.name}`);
+            await admin.graphql(`
+              #graphql
+              mutation scriptTagDelete($id: ID!) {
+                scriptTagDelete(id: $id) {
+                  deletedScriptTagId
+                  userErrors {
+                    field
+                    message
+                  }
+                }
+              }
+            `, {
+              variables: {
+                id: `gid://shopify/ScriptTag/${activePopup.scriptTagId}`
+              }
+            });
+          } catch (error) {
+            console.warn(`⚠️ Failed to delete script tag ${activePopup.scriptTagId}:`, error);
+          }
+        }
+      }
+      
+      // Deactivate existing active popups
+      if (existingActivePopups.length > 0) {
+        await prisma.popup.updateMany({
+          where: {
+            shopId: popup.shopId,
+            status: 'ACTIVE',
+            isDeleted: false,
+            id: { not: popupId }
+          },
+          data: {
+            status: 'PAUSED',
+            scriptTagId: null
+          }
+        });
+        console.log(`✅ Deactivated ${existingActivePopups.length} existing active popup(s)`);
+      }
+      
       // Activating popup - need to create script tag if it doesn't exist
       if (!popup.scriptTagId) {
         console.log("🏗️ Creating script tag for activation...");
