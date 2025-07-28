@@ -63,43 +63,7 @@ export async function action({ request }: ActionFunctionArgs) {
     if (createAsActive) {
       console.log("🏗️ Creating script tag for new active popup...");
       
-      // First, deactivate any existing active popups and clean up their script tags
-      const existingActivePopups = await prisma.popup.findMany({
-        where: {
-          shopId: shop.id,
-          status: 'ACTIVE',
-          isDeleted: false
-        }
-      });
-      
-      // Delete script tags for existing active popups
-      for (const popup of existingActivePopups) {
-        if (popup.scriptTagId) {
-          try {
-            console.log(`🗑️ Deleting script tag ${popup.scriptTagId} for popup ${popup.name}`);
-            await admin.graphql(`
-              #graphql
-              mutation scriptTagDelete($id: ID!) {
-                scriptTagDelete(id: $id) {
-                  deletedScriptTagId
-                  userErrors {
-                    field
-                    message
-                  }
-                }
-              }
-            `, {
-              variables: {
-                id: `gid://shopify/ScriptTag/${popup.scriptTagId}`
-              }
-            });
-          } catch (error) {
-            console.warn(`⚠️ Failed to delete script tag ${popup.scriptTagId}:`, error);
-          }
-        }
-      }
-      
-      // Deactivate existing active popups
+      // Simple database-only single popup enforcement
       await prisma.popup.updateMany({
         where: {
           shopId: shop.id,
@@ -107,11 +71,10 @@ export async function action({ request }: ActionFunctionArgs) {
           isDeleted: false
         },
         data: {
-          status: 'PAUSED',
-          scriptTagId: null
+          status: 'PAUSED'
         }
       });
-      console.log("✅ Deactivated existing active popups and cleaned up script tags");
+      console.log("✅ Deactivated existing active popups (database only)");
       
       const scriptTagUrl = `${process.env.SHOPIFY_APP_URL}/popup-loader-enhanced.js`;
       console.log("📜 Script tag URL:", scriptTagUrl);
@@ -295,6 +258,30 @@ export default function NewPopup() {
   const [totalSteps, setTotalSteps] = useState(1);
   const [targetPages, setTargetPages] = useState<string[]>(['home']);
   const [createAsActive, setCreateAsActive] = useState(false);
+  
+  // Form field states
+  const [popupName, setPopupName] = useState('');
+  const [headline, setHeadline] = useState('');
+  const [description, setDescription] = useState('');
+  const [buttonText, setButtonText] = useState('');
+  const [discountCode, setDiscountCode] = useState('');
+  
+  // Quiz step states
+  const [quizSteps, setQuizSteps] = useState<{[key: number]: {question: string, option1: string, option2: string, option3: string}}>({});
+  
+  // Helper function to update quiz step
+  const updateQuizStep = (stepIndex: number, field: string, value: string) => {
+    setQuizSteps(prev => ({
+      ...prev,
+      [stepIndex]: {
+        ...prev[stepIndex],
+        question: field === 'question' ? value : (prev[stepIndex]?.question || ''),
+        option1: field === 'option1' ? value : (prev[stepIndex]?.option1 || ''),
+        option2: field === 'option2' ? value : (prev[stepIndex]?.option2 || ''),
+        option3: field === 'option3' ? value : (prev[stepIndex]?.option3 || '')
+      }
+    }));
+  };
 
   const isQuizType = popupType === 'QUIZ_EMAIL' || popupType === 'QUIZ_DISCOUNT';
 
@@ -323,6 +310,8 @@ export default function NewPopup() {
                     <TextField
                       label="Popup Name"
                       name="name"
+                      value={popupName}
+                      onChange={setPopupName}
                       placeholder="Summer Sale Popup"
                       helpText="Internal name to identify this popup"
                       autoComplete="off"
@@ -382,12 +371,16 @@ export default function NewPopup() {
                         <TextField
                           label="Headline"
                           name="headline"
+                          value={headline}
+                          onChange={setHeadline}
                           placeholder="Get 10% Off!"
                           autoComplete="off"
                         />
                         <TextField
                           label="Description"
                           name="description"
+                          value={description}
+                          onChange={setDescription}
                           placeholder="Subscribe to our newsletter for exclusive deals"
                           multiline
                           autoComplete="off"
@@ -395,6 +388,8 @@ export default function NewPopup() {
                         <TextField
                           label="Button Text"
                           name="buttonText"
+                          value={buttonText}
+                          onChange={setButtonText}
                           placeholder="Subscribe"
                           autoComplete="off"
                         />
@@ -427,24 +422,32 @@ export default function NewPopup() {
                                   <TextField
                                     label="Question"
                                     name={`step_${i + 1}_question`}
+                                    value={quizSteps[i + 1]?.question || ''}
+                                    onChange={(value) => updateQuizStep(i + 1, 'question', value)}
                                     placeholder={`What's your preference?`}
                                     autoComplete="off"
                                   />
                                   <TextField
                                     label="Option 1"
                                     name={`step_${i + 1}_option_1`}
+                                    value={quizSteps[i + 1]?.option1 || ''}
+                                    onChange={(value) => updateQuizStep(i + 1, 'option1', value)}
                                     placeholder="First option"
                                     autoComplete="off"
                                   />
                                   <TextField
                                     label="Option 2"
                                     name={`step_${i + 1}_option_2`}
+                                    value={quizSteps[i + 1]?.option2 || ''}
+                                    onChange={(value) => updateQuizStep(i + 1, 'option2', value)}
                                     placeholder="Second option"
                                     autoComplete="off"
                                   />
                                   <TextField
                                     label="Option 3 (optional)"
                                     name={`step_${i + 1}_option_3`}
+                                    value={quizSteps[i + 1]?.option3 || ''}
+                                    onChange={(value) => updateQuizStep(i + 1, 'option3', value)}
                                     placeholder="Third option"
                                     autoComplete="off"
                                   />
@@ -462,6 +465,8 @@ export default function NewPopup() {
                         <TextField
                           label="Discount Code"
                           name="discountCode"
+                          value={discountCode}
+                          onChange={setDiscountCode}
                           placeholder="SAVE10"
                           helpText="The discount code to reveal after the quiz"
                           autoComplete="off"

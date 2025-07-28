@@ -1,4 +1,4 @@
-import { type ActionFunctionArgs } from "@remix-run/node";
+import { type ActionFunctionArgs, json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { isMultiPopupEnabled } from "../utils/features";
@@ -9,7 +9,7 @@ export async function action({ request }: ActionFunctionArgs) {
   // Check feature flag
   if (!isMultiPopupEnabled()) {
     console.log("❌ Multi-popup system not enabled");
-    return Response.json({ success: false, error: "Multi-popup system not enabled" }, { status: 400 });
+    return json({ success: false, error: "Multi-popup system not enabled" }, { status: 400 });
   }
 
   const { session, admin } = await authenticate.admin(request);
@@ -26,12 +26,12 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (!popupId || !newStatus) {
     console.log("❌ Missing popupId or status");
-    return Response.json({ success: false, error: "Missing popupId or status" }, { status: 400 });
+    return json({ success: false, error: "Missing popupId or status" }, { status: 400 });
   }
 
   if (!["ACTIVE", "DRAFT", "PAUSED"].includes(newStatus)) {
     console.log("❌ Invalid status:", newStatus);
-    return Response.json({ success: false, error: "Invalid status" }, { status: 400 });
+    return json({ success: false, error: "Invalid status" }, { status: 400 });
   }
 
   try {
@@ -46,7 +46,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     if (!popup) {
       console.log("❌ Popup not found:", popupId);
-      return Response.json({ success: false, error: "Popup not found" }, { status: 404 });
+      return json({ success: false, error: "Popup not found" }, { status: 404 });
     }
 
     console.log("🔍 Current popup state:", {
@@ -60,59 +60,19 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // Handle script tag management based on status change
     if (newStatus === "ACTIVE") {
-      // First, deactivate any other active popups (only one can be active at a time)
-      const existingActivePopups = await prisma.popup.findMany({
+      // Simple database-only single popup enforcement
+      await prisma.popup.updateMany({
         where: {
           shopId: popup.shopId,
           status: 'ACTIVE',
           isDeleted: false,
-          id: { not: popupId } // Exclude current popup
+          id: { not: popupId }
+        },
+        data: {
+          status: 'PAUSED'
         }
       });
-      
-      // Delete script tags for existing active popups
-      for (const activePopup of existingActivePopups) {
-        if (activePopup.scriptTagId) {
-          try {
-            console.log(`🗑️ Deleting script tag ${activePopup.scriptTagId} for popup ${activePopup.name}`);
-            await admin.graphql(`
-              #graphql
-              mutation scriptTagDelete($id: ID!) {
-                scriptTagDelete(id: $id) {
-                  deletedScriptTagId
-                  userErrors {
-                    field
-                    message
-                  }
-                }
-              }
-            `, {
-              variables: {
-                id: `gid://shopify/ScriptTag/${activePopup.scriptTagId}`
-              }
-            });
-          } catch (error) {
-            console.warn(`⚠️ Failed to delete script tag ${activePopup.scriptTagId}:`, error);
-          }
-        }
-      }
-      
-      // Deactivate existing active popups
-      if (existingActivePopups.length > 0) {
-        await prisma.popup.updateMany({
-          where: {
-            shopId: popup.shopId,
-            status: 'ACTIVE',
-            isDeleted: false,
-            id: { not: popupId }
-          },
-          data: {
-            status: 'PAUSED',
-            scriptTagId: null
-          }
-        });
-        console.log(`✅ Deactivated ${existingActivePopups.length} existing active popup(s)`);
-      }
+      console.log("✅ Deactivated other active popups (database only)");
       
       // Activating popup - need to create script tag if it doesn't exist
       if (!popup.scriptTagId) {
@@ -153,13 +113,13 @@ export async function action({ request }: ActionFunctionArgs) {
         } else if (scriptTagResult.data?.scriptTagCreate?.userErrors?.length > 0) {
           const error = scriptTagResult.data.scriptTagCreate.userErrors[0];
           console.log("❌ Script tag creation failed:", error);
-          return Response.json({ 
+          return json({ 
             success: false, 
             error: `Script tag creation failed: ${error.message}` 
           }, { status: 400 });
         } else {
           console.log("⚠️ Unexpected script tag response:", scriptTagResult);
-          return Response.json({ 
+          return json({ 
             success: false, 
             error: "Script tag creation failed: Unexpected response" 
           }, { status: 500 });
@@ -243,11 +203,11 @@ export async function action({ request }: ActionFunctionArgs) {
     };
 
     console.log("🎉 Status API completed successfully:", response);
-    return Response.json(response);
+    return json(response);
 
   } catch (error) {
     console.error("❌ Papa Popup Status API Error:", error);
-    return Response.json({ 
+    return json({ 
       success: false, 
       error: error instanceof Error ? error.message : "Failed to update popup status" 
     }, { status: 500 });
