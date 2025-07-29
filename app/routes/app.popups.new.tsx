@@ -1,6 +1,6 @@
 import { type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, Form, useNavigation, useActionData, redirect } from "@remix-run/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Page,
   Layout,
@@ -275,15 +275,20 @@ export default function NewPopup() {
       ...prev,
       [stepIndex]: {
         ...prev[stepIndex],
-        question: field === 'question' ? value : (prev[stepIndex]?.question || ''),
-        option1: field === 'option1' ? value : (prev[stepIndex]?.option1 || ''),
-        option2: field === 'option2' ? value : (prev[stepIndex]?.option2 || ''),
-        option3: field === 'option3' ? value : (prev[stepIndex]?.option3 || '')
+        [field]: value
       }
     }));
   };
 
   const isQuizType = popupType === 'QUIZ_EMAIL' || popupType === 'QUIZ_DISCOUNT';
+
+  // Auto-set totalSteps when quiz type is selected to ensure forms render
+  useEffect(() => {
+    if (isQuizType && totalSteps < 2) {
+      console.log('🎯 Auto-setting totalSteps to 2 for quiz type:', popupType);
+      setTotalSteps(2); // Show 1 question + email by default
+    }
+  }, [popupType, isQuizType, totalSteps]);
 
   return (
     <Page
@@ -411,6 +416,7 @@ export default function NewPopup() {
                         />
 
                         {/* Quiz Steps */}
+                        {console.log('🔍 Rendering quiz steps:', { totalSteps, isQuizType, arrayLength: totalSteps - 1 })}
                         {Array.from({ length: totalSteps - 1 }, (_, i) => (
                           <Card key={i} subdued>
                             <div style={{ padding: '16px' }}>
