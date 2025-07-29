@@ -1,5 +1,6 @@
 import { type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData, useNavigate } from "@remix-run/react";
+import { useState } from "react";
 import { 
   Page, 
   Layout, 
@@ -114,10 +115,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 function TemplateCard({ template }: { template: any }) {
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  
   const handleUseTemplate = (templateId: string) => {
-    // In a real implementation, this would pre-populate the create form
-    // For now, just redirect to create page with template parameter
-    window.location.href = `/app/popups/new?template=${templateId}`;
+    setIsLoading(true);
+    // Use proper Remix navigation instead of window.location
+    navigate(`/app/popups/new?template=${templateId}`);
   };
 
   return (
@@ -183,6 +187,7 @@ function TemplateCard({ template }: { template: any }) {
           <Button 
             variant="primary" 
             onClick={() => handleUseTemplate(template.id)}
+            loading={isLoading}
           >
             Use This Template
           </Button>

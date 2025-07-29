@@ -1,5 +1,5 @@
 import { type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, Form, useNavigation, useActionData } from "@remix-run/react";
+import { useLoaderData, Form, useNavigation, useActionData, useFetcher } from "@remix-run/react";
 import { useState } from "react";
 import {
   Page,
@@ -490,6 +490,14 @@ function LegacyPopupDashboard({ data, actionData, navigation }: any) {
 // New multi-popup dashboard component
 function MultiPopupDashboard({ data, actionData }: any) {
   const { shop, stats, activePopup } = data;
+  const fetcher = useFetcher();
+  
+  const handlePausePopup = (popupId: string) => {
+    fetcher.submit(
+      { popupId, status: 'PAUSED' },
+      { method: 'POST', action: '/app/api/popups/status' }
+    );
+  };
 
   // Prepare email rows with popup attribution
   const emailRows = shop?.emails.map((email: any) => [
@@ -590,7 +598,16 @@ function MultiPopupDashboard({ data, actionData }: any) {
                   </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <Button url={`/app/popups/${activePopup.id}/edit`}>Edit</Button>
-                    <Button variant="secondary">Pause</Button>
+                    <Button 
+                      variant="secondary"
+                      onClick={() => handlePausePopup(activePopup.id)}
+                      loading={fetcher.state === 'submitting' && fetcher.formData?.get('popupId') === activePopup.id}
+                    >
+                      {fetcher.state === 'submitting' && fetcher.formData?.get('popupId') === activePopup.id 
+                        ? 'Pausing...' 
+                        : 'Pause'
+                      }
+                    </Button>
                     <Button variant="secondary" url={`/app/popups/${activePopup.id}/preview`}>Preview</Button>
                   </div>
                 </div>

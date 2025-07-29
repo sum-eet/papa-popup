@@ -1,5 +1,5 @@
 import { type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData, useFetcher } from "@remix-run/react";
 import { 
   Page, 
   Layout, 
@@ -163,6 +163,14 @@ function PopupPreviewStep({ step, stepNumber, totalSteps }: { step: any, stepNum
 
 export default function PopupPreview() {
   const { popup } = useLoaderData<typeof loader>();
+  const fetcher = useFetcher();
+  
+  const handleActivatePopup = () => {
+    fetcher.submit(
+      { popupId: popup.id, status: 'ACTIVE' },
+      { method: 'POST', action: '/app/api/popups/status' }
+    );
+  };
 
   return (
     <Page
@@ -333,8 +341,12 @@ export default function PopupPreview() {
                   Back to All Popups
                 </Button>
                 {popup.status !== 'ACTIVE' && (
-                  <Button variant="secondary">
-                    Activate Popup
+                  <Button 
+                    variant="secondary"
+                    onClick={handleActivatePopup}
+                    loading={fetcher.state === 'submitting'}
+                  >
+                    {fetcher.state === 'submitting' ? 'Activating...' : 'Activate Popup'}
                   </Button>
                 )}
                 <Button variant="secondary" url={`https://${popup.shop.domain}`} external>

@@ -27,7 +27,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   await authenticate.admin(request);
-  return {};
+  
+  // Check for template parameter
+  const url = new URL(request.url);
+  const templateId = url.searchParams.get('template');
+  
+  return { templateId };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -250,19 +255,59 @@ const PAGE_OPTIONS = [
 ];
 
 export default function NewPopup() {
+  const { templateId } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
-  const [popupType, setPopupType] = useState<PopupType>('SIMPLE_EMAIL');
-  const [totalSteps, setTotalSteps] = useState(1);
+  // Template configurations
+  const getTemplateDefaults = (templateId: string | null) => {
+    switch (templateId) {
+      case 'skincare-quiz':
+        return {
+          popupType: 'QUIZ_EMAIL' as PopupType,
+          name: 'Skincare Quiz',
+          headline: 'Find Your Perfect Skincare Routine',
+          description: 'Get personalized recommendations',
+          totalSteps: 3
+        };
+      case 'newsletter-signup':
+        return {
+          popupType: 'SIMPLE_EMAIL' as PopupType,
+          name: 'Newsletter Signup',
+          headline: 'Get 10% Off Your First Order',
+          description: 'Subscribe to our newsletter for exclusive deals',
+          totalSteps: 1
+        };
+      case 'product-quiz':
+        return {
+          popupType: 'QUIZ_DISCOUNT' as PopupType,
+          name: 'Product Recommendation Quiz',
+          headline: 'Find Your Perfect Product',
+          description: 'Get 15% off your recommended products',
+          totalSteps: 4
+        };
+      default:
+        return {
+          popupType: 'SIMPLE_EMAIL' as PopupType,
+          name: '',
+          headline: '',
+          description: '',
+          totalSteps: 1
+        };
+    }
+  };
+
+  const templateDefaults = getTemplateDefaults(templateId);
+  const [popupType, setPopupType] = useState<PopupType>(templateDefaults.popupType);
+  const [totalSteps, setTotalSteps] = useState(templateDefaults.totalSteps);
   const [targetPages, setTargetPages] = useState<string[]>(['home']);
   const [createAsActive, setCreateAsActive] = useState(false);
   
   // Form field states
-  const [popupName, setPopupName] = useState('');
-  const [headline, setHeadline] = useState('');
-  const [description, setDescription] = useState('');
+  const [popupName, setPopupName] = useState(templateDefaults.name);
+  const [headline, setHeadline] = useState(templateDefaults.headline);
+  const [description, setDescription] = useState(templateDefaults.description);
   const [buttonText, setButtonText] = useState('');
   const [discountCode, setDiscountCode] = useState('');
   
@@ -292,7 +337,8 @@ export default function NewPopup() {
 
   return (
     <Page
-      title="Create New Popup"
+      title={templateId ? `Create New Popup (${templateDefaults.name})` : "Create New Popup"}
+      subtitle={templateId ? "Using template with pre-filled defaults" : undefined}
       backAction={{
         content: 'Back to popups',
         url: '/app/popups'
