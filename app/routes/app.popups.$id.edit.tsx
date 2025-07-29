@@ -207,35 +207,6 @@ export default function EditPopup() {
     : popup.targetingRules;
   const existingPages = targetingRules.pages || ['home'];
 
-  const [popupType, setPopupType] = useState<PopupType>(popup.popupType);
-  const [totalSteps, setTotalSteps] = useState(popup.totalSteps);
-  const [targetPages, setTargetPages] = useState<string[]>(existingPages);
-  const [popupName, setPopupName] = useState(popup.name);
-  
-  // State for content fields
-  const [headline, setHeadline] = useState(getStepContent(1, 'headline'));
-  const [description, setDescription] = useState(getStepContent(1, 'description'));
-  const [buttonText, setButtonText] = useState(getStepContent(1, 'buttonText'));
-  
-  // State for quiz steps
-  const [quizSteps, setQuizSteps] = useState(() => {
-    const steps: any = {};
-    for (let i = 1; i < totalSteps; i++) {
-      steps[i] = {
-        question: getStepContent(i, 'question'),
-        option1: getStepOption(i, 0),
-        option2: getStepOption(i, 1),
-        option3: getStepOption(i, 2)
-      };
-    }
-    return steps;
-  });
-  
-  // State for discount code
-  const [discountCode, setDiscountCode] = useState(getStepContent(totalSteps, 'codeDisplay'));
-
-  const isQuizType = popupType === 'QUIZ_EMAIL' || popupType === 'QUIZ_DISCOUNT';
-  
   // Get existing step data for form pre-population
   const getStepContent = (stepNumber: number, field: string) => {
     const step = popup.steps.find(s => s.stepNumber === stepNumber);
@@ -252,6 +223,45 @@ export default function EditPopup() {
     const content = typeof step.content === 'string' ? JSON.parse(step.content) : step.content;
     return content.options?.[optionIndex]?.text || '';
   };
+
+  const [popupType, setPopupType] = useState<PopupType>(popup.popupType);
+  const [totalSteps, setTotalSteps] = useState(popup.totalSteps);
+  const [targetPages, setTargetPages] = useState<string[]>(existingPages);
+  const [popupName, setPopupName] = useState(popup.name);
+  
+  // State for content fields - initialized safely with empty strings
+  const [headline, setHeadline] = useState('');
+  const [description, setDescription] = useState('');
+  const [buttonText, setButtonText] = useState('');
+  
+  // State for quiz steps - initialized safely with empty object
+  const [quizSteps, setQuizSteps] = useState<{[key: number]: {question: string, option1: string, option2: string, option3: string}}>({});
+  
+  // State for discount code - initialized safely with empty string
+  const [discountCode, setDiscountCode] = useState('');
+
+  const isQuizType = popupType === 'QUIZ_EMAIL' || popupType === 'QUIZ_DISCOUNT';
+  
+  // Populate state safely after component mounts
+  useEffect(() => {
+    // Populate content fields
+    setHeadline(getStepContent(1, 'headline'));
+    setDescription(getStepContent(1, 'description'));
+    setButtonText(getStepContent(1, 'buttonText'));
+    setDiscountCode(getStepContent(totalSteps, 'codeDisplay'));
+    
+    // Populate quiz steps
+    const steps: {[key: number]: {question: string, option1: string, option2: string, option3: string}} = {};
+    for (let i = 1; i < totalSteps; i++) {
+      steps[i] = {
+        question: getStepContent(i, 'question'),
+        option1: getStepOption(i, 0),
+        option2: getStepOption(i, 1),
+        option3: getStepOption(i, 2)
+      };
+    }
+    setQuizSteps(steps);
+  }, []); // Empty dependency array - run once after mount
   
   // Helper function to update quiz step
   const updateQuizStep = (stepIndex: number, field: string, value: string) => {
