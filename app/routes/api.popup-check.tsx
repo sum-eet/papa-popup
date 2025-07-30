@@ -52,7 +52,7 @@ async function handleLegacyPopupCheck(shopDomain: string, pageType: string, page
 
 // New multi-popup system handler  
 async function handleMultiPopupCheck(shopDomain: string, pageType: string, pageUrl: string, corsHeaders: Record<string, string>) {
-  console.log("🚀 Using multi-popup system for:", shopDomain);
+  console.log("🚀 Using multi-popup system for:", shopDomain, "pageType:", pageType);
   
   // Find shop and active popups
   const shop = await prisma.shop.findUnique({
@@ -73,9 +73,29 @@ async function handleMultiPopupCheck(shopDomain: string, pageType: string, pageU
     }
   });
 
+  console.log("🔍 Multi-popup debug:", {
+    shopFound: !!shop,
+    shopId: shop?.id,
+    activePopupsCount: shop?.popups?.length || 0,
+    popups: shop?.popups?.map(p => ({
+      id: p.id,
+      name: p.name,
+      status: p.status,
+      scriptTagId: p.scriptTagId,
+      targetingRules: p.targetingRules
+    })) || []
+  });
+
   if (!shop || !shop.popups.length) {
     return new Response(
-      JSON.stringify({ showPopup: false, reason: "No active multi-popups" }),
+      JSON.stringify({ 
+        showPopup: false, 
+        reason: "No active multi-popups",
+        debug: {
+          shopFound: !!shop,
+          popupsCount: shop?.popups?.length || 0
+        }
+      }),
       { status: 200, headers: corsHeaders }
     );
   }

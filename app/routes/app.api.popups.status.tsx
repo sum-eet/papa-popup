@@ -78,7 +78,7 @@ export async function action({ request }: ActionFunctionArgs) {
       if (!popup.scriptTagId) {
         console.log("🏗️ Creating script tag for activation...");
         
-        const scriptTagUrl = `${process.env.SHOPIFY_APP_URL}/popup-loader-enhanced.js`;
+        const scriptTagUrl = `${process.env.SHOPIFY_APP_URL}popup-loader-enhanced.js`;
         console.log("📜 Script tag URL:", scriptTagUrl);
         
         const scriptTagResponse = await admin.graphql(`

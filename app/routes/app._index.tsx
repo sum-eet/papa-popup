@@ -192,7 +192,7 @@ export async function action({ request }: ActionFunctionArgs) {
     if (isEnabled) {
       console.log("🏗️ Creating new script tag...");
       // Create new script tag
-      const scriptTagUrl = `${process.env.SHOPIFY_APP_URL}/popup-loader-enhanced.js`;
+      const scriptTagUrl = `${process.env.SHOPIFY_APP_URL}popup-loader-enhanced.js`;
       console.log("📜 Script tag URL:", scriptTagUrl);
       
       const scriptTagResponse = await admin.graphql(`

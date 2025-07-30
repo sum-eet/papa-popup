@@ -81,7 +81,7 @@ export async function action({ request }: ActionFunctionArgs) {
       });
       console.log("✅ Deactivated existing active popups (database only)");
       
-      const scriptTagUrl = `${process.env.SHOPIFY_APP_URL}/popup-loader-enhanced.js`;
+      const scriptTagUrl = `${process.env.SHOPIFY_APP_URL}popup-loader-enhanced.js`;
       console.log("📜 Script tag URL:", scriptTagUrl);
       
       const scriptTagResponse = await admin.graphql(`
