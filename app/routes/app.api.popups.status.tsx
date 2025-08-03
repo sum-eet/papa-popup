@@ -105,23 +105,57 @@ export async function action({ request }: ActionFunctionArgs) {
         });
 
         const scriptTagResult = await scriptTagResponse.json();
-        console.log("📋 Script tag creation response:", JSON.stringify(scriptTagResult, null, 2));
+        console.log("📋 FULL Script tag creation response:", JSON.stringify(scriptTagResult, null, 2));
+        console.log("🔍 Response analysis:", {
+          hasData: !!scriptTagResult.data,
+          hasScriptTag: !!scriptTagResult.data?.scriptTagCreate?.scriptTag,
+          scriptTagId: scriptTagResult.data?.scriptTagCreate?.scriptTag?.id,
+          scriptTagSrc: scriptTagResult.data?.scriptTagCreate?.scriptTag?.src,
+          hasUserErrors: !!scriptTagResult.data?.scriptTagCreate?.userErrors?.length,
+          userErrors: scriptTagResult.data?.scriptTagCreate?.userErrors || [],
+          responseStatus: scriptTagResponse.status,
+          responseOk: scriptTagResponse.ok
+        });
         
         if (scriptTagResult.data?.scriptTagCreate?.scriptTag?.id) {
           scriptTagId = scriptTagResult.data.scriptTagCreate.scriptTag.id.replace('gid://shopify/ScriptTag/', '');
           console.log("✅ Script tag created successfully! ID:", scriptTagId);
+          console.log("✅ Script tag src:", scriptTagResult.data.scriptTagCreate.scriptTag.src);
+          
+          // Verify the script tag actually exists by querying it back
+          try {
+            const verifyResponse = await admin.graphql(`
+              #graphql
+              query {
+                scriptTags(first: 10) {
+                  edges {
+                    node {
+                      id
+                      src
+                      displayScope
+                    }
+                  }
+                }
+              }
+            `);
+            const verifyResult = await verifyResponse.json();
+            console.log("🔍 Verification - All script tags:", JSON.stringify(verifyResult, null, 2));
+          } catch (verifyError) {
+            console.log("⚠️ Could not verify script tags:", verifyError);
+          }
         } else if (scriptTagResult.data?.scriptTagCreate?.userErrors?.length > 0) {
           const error = scriptTagResult.data.scriptTagCreate.userErrors[0];
-          console.log("❌ Script tag creation failed:", error);
+          console.log("❌ Script tag creation failed with user errors:", error);
           return json({ 
             success: false, 
             error: `Script tag creation failed: ${error.message}` 
           }, { status: 400 });
         } else {
-          console.log("⚠️ Unexpected script tag response:", scriptTagResult);
+          console.log("⚠️ Unexpected script tag response - no script tag ID and no user errors");
+          console.log("⚠️ This usually means Shopify silently rejected the request");
           return json({ 
             success: false, 
-            error: "Script tag creation failed: Unexpected response" 
+            error: "Script tag creation failed: No script tag returned by Shopify API" 
           }, { status: 500 });
         }
       } else {
