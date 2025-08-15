@@ -75,7 +75,7 @@ export async function action({ request }: ActionFunctionArgs) {
       console.log("✅ Deactivated other active popups (database only)");
       
       // Activating popup - need to create script tag if it doesn't exist
-      if (!popup.scriptTagId) {
+      if (!popup.scriptTagId || popup.scriptTagId === null || popup.scriptTagId === undefined) {
         console.log("🏗️ Creating script tag for activation...");
         
         const scriptTagUrl = `${process.env.SHOPIFY_APP_URL}popup-loader-enhanced.js`;
