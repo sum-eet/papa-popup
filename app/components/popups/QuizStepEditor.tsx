@@ -5,7 +5,6 @@ import {
   TextField, 
   Select, 
   Button, 
-  ButtonGroup,
   Text 
 } from "@shopify/polaris";
 import type { PopupStep, StepType } from "../../types/popup";

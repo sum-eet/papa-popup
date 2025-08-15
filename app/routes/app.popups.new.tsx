@@ -13,12 +13,12 @@ import {
   Banner,
   Text,
   Divider,
-  ButtonGroup
+  ButtonGroup,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { isMultiPopupEnabled } from "../utils/features";
-import { PopupType, StepType, DiscountType } from "../types/popup";
+import type { PopupType } from "../types/popup";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Check feature flag

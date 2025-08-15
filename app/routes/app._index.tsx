@@ -15,12 +15,11 @@ import {
   Banner,
   Grid,
   Text,
-  Divider
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { isMultiPopupEnabled } from "../utils/features";
-import type { PopupStatsResponse, Popup, CollectedEmail } from "../types/popup";
+import type { PopupStatsResponse } from "../types/popup";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
@@ -289,7 +288,6 @@ export default function Index() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
-  const isSubmitting = navigation.state === "submitting";
   
   // Conditional rendering based on system type
   if (data.system === 'multi') {
@@ -310,7 +308,7 @@ function LegacyPopupDashboard({ data, actionData, navigation }: any) {
   const [description, setDescription] = useState(shop?.popupConfig?.description || "Subscribe to our newsletter for exclusive deals");
   const [buttonText, setButtonText] = useState(shop?.popupConfig?.buttonText || "Subscribe");
 
-  const emailRows = shop?.emails.map(email => [
+  const emailRows = shop?.emails.map((email: any) => [
     email.email,
     new Date(email.createdAt).toLocaleDateString()
   ]) || [];
@@ -321,14 +319,14 @@ function LegacyPopupDashboard({ data, actionData, navigation }: any) {
         {actionData && (
           <Layout.Section>
             {actionData.success ? (
-              <Banner status="success">
+              <Banner tone="success">
                 <p>✅ Popup configuration updated successfully!</p>
                 {actionData.config?.enabled && actionData.config?.scriptTagId && (
                   <p>Script tag created with ID: {actionData.config.scriptTagId}</p>
                 )}
               </Banner>
             ) : (
-              <Banner status="critical">
+              <Banner tone="critical">
                 <p>❌ Error: {actionData.error}</p>
               </Banner>
             )}
@@ -512,8 +510,7 @@ function MultiPopupDashboard({ data, actionData }: any) {
       title="Papa Popup Dashboard" 
       primaryAction={{
         content: 'Create New Popup',
-        url: '/app/popups/new',
-        variant: 'primary'
+        url: '/app/popups/new'
       }}
       secondaryActions={[
         { content: 'Manage All Popups', url: '/app/popups' },
@@ -524,11 +521,11 @@ function MultiPopupDashboard({ data, actionData }: any) {
         {actionData && (
           <Layout.Section>
             {actionData.success ? (
-              <Banner status="success">
+              <Banner tone="success">
                 <p>✅ {actionData.message}</p>
               </Banner>
             ) : (
-              <Banner status="critical">
+              <Banner tone="critical">
                 <p>❌ Error: {actionData.error}</p>
               </Banner>
             )}
@@ -642,7 +639,7 @@ function MultiPopupDashboard({ data, actionData }: any) {
                         </Text>
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <Badge tone={popup.status === 'ACTIVE' ? 'success' : popup.status === 'DRAFT' ? 'attention' : 'subdued'}>
+                        <Badge tone={popup.status === 'ACTIVE' ? 'success' : popup.status === 'DRAFT' ? 'attention' : 'info'}>
                           {popup.status.toLowerCase()}
                         </Badge>
                         <Button size="micro" url={`/app/popups/${popup.id}/edit`}>Edit</Button>
@@ -693,7 +690,7 @@ function MultiPopupDashboard({ data, actionData }: any) {
         {/* Feature Migration Banner */}
         {shop.popupConfig && (
           <Layout.Section>
-            <Banner status="info">
+            <Banner tone="info">
               <p>
                 <strong>🆕 New Multi-Popup System Active!</strong> Your previous popup has been migrated and is ready to use. 
                 You can now create multiple popups with advanced quiz functionality.

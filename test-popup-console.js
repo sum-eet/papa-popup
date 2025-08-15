@@ -118,22 +118,23 @@ var testFunctions = {
     
     // Simulate answering questions
     console.log('🎯 Simulating quiz responses...');
-    sessionData.responses.step_1 = { question: "What's your skin type?", answer: "combination" };
+    sessionData.responses['step_1'] = { question: "What's your skin type?", answer: "combination" };
     sessionData.currentStep = 2;
     
-    sessionData.responses.step_2 = { question: "What's your main skin concern?", answer: "acne" };
+    sessionData.responses['step_2'] = { question: "What's your main skin concern?", answer: "acne" };
     sessionData.currentStep = 3;
     
-    sessionData.responses.step_3 = { email: "test@example.com" };
+    sessionData.responses['step_3'] = { email: "test@example.com" };
     sessionData.currentStep = 3;
-    sessionData.isCompleted = true;
+    sessionData['isCompleted'] = true;
     
     console.log('✅ Session data with responses:', sessionData);
     
     // Test localStorage
     try {
       localStorage.setItem('papa-popup-test-session', JSON.stringify(sessionData));
-      var retrieved = JSON.parse(localStorage.getItem('papa-popup-test-session'));
+      var retrievedData = localStorage.getItem('papa-popup-test-session');
+      var retrieved = retrievedData ? JSON.parse(retrievedData) : null;
       console.log('✅ LocalStorage test passed:', retrieved);
     } catch (error) {
       console.log('❌ LocalStorage test failed:', error);

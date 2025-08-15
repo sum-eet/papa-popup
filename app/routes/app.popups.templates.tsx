@@ -8,8 +8,7 @@ import {
   Text,
   Grid,
   Button,
-  Badge,
-  EmptyState
+  Badge
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { isMultiPopupEnabled } from "../utils/features";

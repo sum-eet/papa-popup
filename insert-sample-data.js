@@ -2,13 +2,6 @@
 // Run with: node insert-sample-data.js
 
 import { PrismaClient } from '@prisma/client';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { authenticate } from './app/shopify.server.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 const prisma = new PrismaClient();
 

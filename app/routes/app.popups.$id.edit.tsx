@@ -13,12 +13,12 @@ import {
   Banner,
   Text,
   Divider,
-  ButtonGroup
+  ButtonGroup,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { isMultiPopupEnabled } from "../utils/features";
-import { PopupType, StepType, DiscountType } from "../types/popup";
+import type { PopupType } from "../types/popup";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   // Check feature flag
@@ -59,7 +59,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return redirect("/app");
   }
 
-  const { session } = await authenticate.admin(request);
+  await authenticate.admin(request);
   const popupId = params.id;
   const formData = await request.formData();
 
@@ -224,7 +224,7 @@ export default function EditPopup() {
     return content.options?.[optionIndex]?.text || '';
   };
 
-  const [popupType, setPopupType] = useState<PopupType>(popup.popupType);
+  const [popupType, setPopupType] = useState<PopupType>(popup.popupType as PopupType);
   const [totalSteps, setTotalSteps] = useState(popup.totalSteps);
   const [targetPages, setTargetPages] = useState<string[]>(existingPages);
   const [popupName, setPopupName] = useState(popup.name);
@@ -261,7 +261,7 @@ export default function EditPopup() {
       };
     }
     setQuizSteps(steps);
-  }, []); // Empty dependency array - run once after mount
+  }, [getStepContent, getStepOption, totalSteps]); // Dependencies for proper updates
   
   // Helper function to update quiz step
   const updateQuizStep = (stepIndex: number, field: string, value: string) => {
@@ -301,7 +301,7 @@ export default function EditPopup() {
       <Layout>
         <Layout.Section>
           {actionData && !actionData.success && (
-            <Banner status="critical">
+            <Banner tone="critical">
               <p>Error: {actionData.error}</p>
             </Banner>
           )}
@@ -410,7 +410,7 @@ export default function EditPopup() {
 
                         {/* Quiz Steps */}
                         {Array.from({ length: totalSteps - 1 }, (_, i) => (
-                          <Card key={i} subdued>
+                          <Card key={i}>
                             <div style={{ padding: '16px' }}>
                               <Text variant="bodyMd" as="p" fontWeight="semibold">
                                 Question {i + 1}

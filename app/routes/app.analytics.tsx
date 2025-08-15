@@ -8,8 +8,7 @@ import {
   Grid,
   DataTable,
   EmptyState,
-  Badge,
-  Divider
+  Badge
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";

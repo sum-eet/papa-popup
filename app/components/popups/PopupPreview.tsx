@@ -1,4 +1,4 @@
-import { Card, Text, Button } from "@shopify/polaris";
+import { Text, Button } from "@shopify/polaris";
 import type { Popup } from "../../types/popup";
 
 interface PopupPreviewProps {
