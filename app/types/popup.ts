@@ -41,6 +41,14 @@ export interface TargetingRules {
   specific?: string[]; // Specific URLs or patterns
 }
 
+// Trigger types and configuration
+export type TriggerType = 'delay' | 'scroll' | 'url';
+
+export interface TriggerConfig {
+  type: TriggerType;
+  value: number | string; // seconds for delay, percentage for scroll, URL pattern for url
+}
+
 // Quiz option structure
 export interface QuizOption {
   id: string;

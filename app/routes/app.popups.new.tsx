@@ -59,8 +59,20 @@ export async function action({ request }: ActionFunctionArgs) {
     const targetPages = formData.getAll("targetPages") as string[];
     const totalSteps = parseInt(formData.get("totalSteps") as string) || 1;
     const createAsActive = formData.get("createAsActive") === "true";
+    
+    // Extract trigger configuration
+    const triggerType = formData.get("triggerType") as string || "delay";
+    const triggerValue = formData.get("triggerValue") as string || "2";
+    
+    // Create trigger config object
+    const triggerConfig = {
+      type: triggerType,
+      value: triggerType === "delay" || triggerType === "scroll" 
+        ? parseInt(triggerValue) || 2 
+        : triggerValue || "/"
+    };
 
-    console.log("🚀 Creating popup:", { name, popupType, totalSteps, createAsActive });
+    console.log("🚀 Creating popup:", { name, popupType, totalSteps, createAsActive, triggerConfig });
 
     let scriptTagId: string | null = null;
 
@@ -131,6 +143,7 @@ export async function action({ request }: ActionFunctionArgs) {
         status: createAsActive ? 'ACTIVE' : 'DRAFT',
         priority: 1,
         targetingRules: JSON.stringify({ pages: targetPages.length > 0 ? targetPages : ['all'] }),
+        triggerConfig: JSON.stringify(triggerConfig),
         popupType,
         totalSteps,
         discountType: 'FIXED',
@@ -304,6 +317,10 @@ export default function NewPopup() {
   const [targetPages, setTargetPages] = useState<string[]>(['home']);
   const [createAsActive, setCreateAsActive] = useState(false);
   
+  // Trigger configuration state
+  const [triggerType, setTriggerType] = useState<'delay' | 'scroll' | 'url'>('delay');
+  const [triggerValue, setTriggerValue] = useState<string>('2');
+  
   // Form field states
   const [popupName, setPopupName] = useState(templateDefaults.name);
   const [headline, setHeadline] = useState(templateDefaults.headline);
@@ -397,6 +414,50 @@ export default function NewPopup() {
                             }}
                           />
                         ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <Text variant="bodyMd" as="p">Popup Trigger</Text>
+                      <div style={{ marginTop: '8px' }}>
+                        <Select
+                          label=""
+                          name="triggerType"
+                          options={[
+                            { label: 'Time Delay (seconds)', value: 'delay' },
+                            { label: 'Scroll Percentage (%)', value: 'scroll' },
+                            { label: 'Specific URL/Page', value: 'url' }
+                          ]}
+                          value={triggerType}
+                          onChange={(value) => {
+                            setTriggerType(value as 'delay' | 'scroll' | 'url');
+                            // Reset trigger value when type changes
+                            if (value === 'delay') setTriggerValue('2');
+                            else if (value === 'scroll') setTriggerValue('50');
+                            else if (value === 'url') setTriggerValue('/');
+                          }}
+                        />
+                        
+                        <div style={{ marginTop: '12px' }}>
+                          <TextField
+                            label={
+                              triggerType === 'delay' ? 'Delay in seconds' :
+                              triggerType === 'scroll' ? 'Scroll percentage (0-100)' :
+                              'URL pattern (e.g., /products/skincare)'
+                            }
+                            name="triggerValue"
+                            value={triggerValue}
+                            onChange={setTriggerValue}
+                            type={triggerType === 'url' ? 'text' : 'number'}
+                            min={triggerType === 'url' ? undefined : '0'}
+                            max={triggerType === 'scroll' ? '100' : undefined}
+                            helpText={
+                              triggerType === 'delay' ? 'Popup will show after this many seconds' :
+                              triggerType === 'scroll' ? 'Popup will show after user scrolls this percentage of the page' :
+                              'Popup will show only on pages matching this URL pattern'
+                            }
+                          />
+                        </div>
                       </div>
                     </div>
 

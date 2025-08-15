@@ -36,73 +36,6 @@
     return 'other';
   }
 
-  // Check if popup should show
-  async function checkPopup() {
-    console.log('🔍 Papa Popup: Starting popup check process...');
-    
-    try {
-      // Skip if already shown in this session
-      if (sessionStorage.getItem(POPUP_SHOWN_KEY)) {
-        console.log('⏭️ Papa Popup: Already shown in this session, skipping');
-        return;
-      }
-
-      const shopDomain = window.location.hostname;
-      const pageType = getPageType();
-      const pageUrl = window.location.href;
-
-      console.log('📊 Papa Popup: Gathered page info:', { 
-        shopDomain, 
-        pageType, 
-        pageUrl,
-        userAgent: navigator.userAgent.substring(0, 50) + '...',
-        timestamp: new Date().toISOString()
-      });
-
-      console.log('🌐 Papa Popup: Making API request to:', `${APP_URL}/api/popup-check`);
-
-      const response = await fetch(`${APP_URL}/api/popup-check`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          shopDomain,
-          pageType,
-          pageUrl
-        })
-      });
-
-      console.log('📡 Papa Popup: API response received:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok
-      });
-
-      if (!response.ok) {
-        console.log('❌ Papa Popup: API check failed with status:', response.status);
-        return;
-      }
-
-      const data = await response.json();
-      console.log('📋 Papa Popup: API response data:', JSON.stringify(data, null, 2));
-
-      if (data.showPopup && data.config) {
-        console.log('✅ Papa Popup: Should show popup with config:', data.config);
-        
-        // Check if this is a multi-step popup
-        if (data.config.popupType && data.config.popupType !== 'SIMPLE_EMAIL') {
-          await initializeMultiStepPopup(data.config);
-        } else {
-          renderLegacyPopup(data.config);
-        }
-      } else {
-        console.log('🚫 Papa Popup: Should NOT show popup');
-      }
-    } catch (error) {
-      console.error('💥 Papa Popup: Check failed with error:', error);
-    }
-  }
 
   // Initialize multi-step popup session
   async function initializeMultiStepPopup(config) {
@@ -1018,13 +951,163 @@
     }
   }
 
-  // Wait for DOM ready and then check popup
+  // Check popup with trigger evaluation
+  async function checkPopupWithTrigger() {
+    console.log('🎯 Papa Popup: Starting popup check with trigger evaluation...');
+    
+    try {
+      // Skip if already shown in this session
+      if (sessionStorage.getItem(POPUP_SHOWN_KEY)) {
+        console.log('⏭️ Papa Popup: Already shown in this session, skipping');
+        return;
+      }
+
+      const shopDomain = window.location.hostname;
+      const pageType = getPageType();
+      const pageUrl = window.location.href;
+
+      console.log('📊 Papa Popup: Fetching popup config with trigger info...');
+
+      const response = await fetch(`${APP_URL}/api/popup-check`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          shopDomain,
+          pageType,
+          pageUrl
+        })
+      });
+
+      if (!response.ok) {
+        console.log('❌ Papa Popup: API check failed with status:', response.status);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('📋 Papa Popup: API response with trigger config:', JSON.stringify(data, null, 2));
+
+      if (data.showPopup && data.config) {
+        const triggerConfig = data.config.triggerConfig || { type: 'delay', value: 2 };
+        console.log('🔧 Papa Popup: Evaluating trigger:', triggerConfig);
+        
+        await evaluateTrigger(triggerConfig, data.config);
+      } else {
+        console.log('🚫 Papa Popup: No popup to show');
+      }
+    } catch (error) {
+      console.error('💥 Papa Popup: Trigger evaluation failed:', error);
+    }
+  }
+
+  // Evaluate trigger and show popup when condition is met
+  async function evaluateTrigger(triggerConfig, popupConfig) {
+    const { type, value } = triggerConfig;
+    
+    console.log(`⏰ Papa Popup: Evaluating ${type} trigger with value:`, value);
+    
+    switch (type) {
+      case 'delay':
+        const delaySeconds = parseInt(value) || 2;
+        console.log(`⏰ Papa Popup: Setting ${delaySeconds}s delay trigger...`);
+        setTimeout(() => {
+          console.log(`⏰ Papa Popup: ${delaySeconds}s delay completed, showing popup...`);
+          showPopupWithConfig(popupConfig);
+        }, delaySeconds * 1000);
+        break;
+        
+      case 'scroll':
+        const scrollPercentage = parseInt(value) || 50;
+        console.log(`📜 Papa Popup: Setting ${scrollPercentage}% scroll trigger...`);
+        setupScrollTrigger(scrollPercentage, popupConfig);
+        break;
+        
+      case 'url':
+        const urlPattern = value || '/';
+        console.log(`🔗 Papa Popup: Checking URL pattern: ${urlPattern}`);
+        if (checkUrlMatch(urlPattern)) {
+          console.log(`🔗 Papa Popup: URL matches pattern, showing popup immediately...`);
+          showPopupWithConfig(popupConfig);
+        } else {
+          console.log(`🔗 Papa Popup: URL doesn't match pattern, skipping popup`);
+        }
+        break;
+        
+      default:
+        console.log(`⚠️ Papa Popup: Unknown trigger type: ${type}, defaulting to 2s delay`);
+        setTimeout(() => {
+          showPopupWithConfig(popupConfig);
+        }, 2000);
+    }
+  }
+
+  // Setup scroll percentage trigger
+  function setupScrollTrigger(percentage, popupConfig) {
+    let triggered = false;
+    
+    const checkScroll = () => {
+      if (triggered) return;
+      
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const documentHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const scrollPercent = Math.round((scrollTop / documentHeight) * 100);
+      
+      console.log(`📜 Papa Popup: Current scroll: ${scrollPercent}%, target: ${percentage}%`);
+      
+      if (scrollPercent >= percentage) {
+        triggered = true;
+        console.log(`📜 Papa Popup: Scroll target reached (${scrollPercent}%), showing popup...`);
+        window.removeEventListener('scroll', checkScroll);
+        showPopupWithConfig(popupConfig);
+      }
+    };
+    
+    window.addEventListener('scroll', checkScroll, { passive: true });
+    
+    // Also check immediately in case user is already past the threshold
+    checkScroll();
+  }
+
+  // Check if current URL matches the pattern
+  function checkUrlMatch(pattern) {
+    const currentUrl = window.location.pathname;
+    
+    // Simple pattern matching - exact match or contains
+    if (pattern === currentUrl) {
+      return true;
+    }
+    
+    // Check if URL contains the pattern
+    if (currentUrl.includes(pattern)) {
+      return true;
+    }
+    
+    // Check for wildcard patterns (basic implementation)
+    if (pattern.includes('*')) {
+      const regex = new RegExp(pattern.replace(/\*/g, '.*'));
+      return regex.test(currentUrl);
+    }
+    
+    return false;
+  }
+
+  // Show popup with the given config (replaces the old checkPopup logic)
+  async function showPopupWithConfig(config) {
+    console.log('🎨 Papa Popup: Showing popup with config:', config);
+    
+    // Check if this is a multi-step popup
+    if (config.popupType && config.popupType !== 'SIMPLE_EMAIL') {
+      await initializeMultiStepPopup(config);
+    } else {
+      renderLegacyPopup(config);
+    }
+  }
+
+  // Wait for DOM ready and then check popup with trigger logic
   function initPopup() {
-    console.log('⏰ Papa Popup: DOM ready, waiting 2 seconds before checking popup...');
-    setTimeout(() => {
-      console.log('⏰ Papa Popup: 2 second delay complete, starting popup check...');
-      checkPopup();
-    }, 2000);
+    console.log('⏰ Papa Popup: DOM ready, starting popup check with trigger evaluation...');
+    checkPopupWithTrigger();
   }
 
   // DOM ready detection
@@ -1046,10 +1129,10 @@
   };
 
   window.testPapaPopup = function() {
-    console.log('🧪 Testing Papa Popup immediately...');
+    console.log('🧪 Testing Papa Popup immediately with trigger system...');
     sessionStorage.removeItem(POPUP_SHOWN_KEY);
     localStorage.removeItem(SESSION_KEY);
-    checkPopup();
+    checkPopupWithTrigger();
   };
 
   window.debugPapaPopup = function() {

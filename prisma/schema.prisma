@@ -103,6 +103,9 @@ model Popup {
   // Targeting
   targetingRules  Json     @default("{}") // {"pages": ["all"], "specific": []}
   
+  // Trigger configuration
+  triggerConfig   Json     @default("{\"type\": \"delay\", \"value\": 2}") // {"type": "delay|scroll|url", "value": number|string}
+  
   // Configuration
   popupType       PopupType @default(SIMPLE_EMAIL)
   totalSteps      Int      @default(1)

@@ -128,6 +128,9 @@ async function handleMultiPopupCheck(shopDomain: string, pageType: string, pageU
     popupId: selectedPopup.id,
     popupType: selectedPopup.popupType,
     totalSteps: selectedPopup.totalSteps,
+    triggerConfig: typeof selectedPopup.triggerConfig === 'string' 
+      ? JSON.parse(selectedPopup.triggerConfig) 
+      : selectedPopup.triggerConfig,
     steps: selectedPopup.steps.map(step => ({
       stepNumber: step.stepNumber,
       stepType: step.stepType,
