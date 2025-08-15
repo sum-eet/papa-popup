@@ -1,0 +1,1 @@
+- ensure you do not change the application url  and rediirect url in shopify app toml. it has to be my vercel link. fix it for now and never touch it again.
