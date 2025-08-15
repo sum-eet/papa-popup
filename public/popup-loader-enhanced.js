@@ -1023,17 +1023,6 @@
         setupScrollTrigger(scrollPercentage, popupConfig);
         break;
         
-      case 'url':
-        const urlPattern = value || '/';
-        console.log(`🔗 Papa Popup: Checking URL pattern: ${urlPattern}`);
-        if (checkUrlMatch(urlPattern)) {
-          console.log(`🔗 Papa Popup: URL matches pattern, showing popup immediately...`);
-          showPopupWithConfig(popupConfig);
-        } else {
-          console.log(`🔗 Papa Popup: URL doesn't match pattern, skipping popup`);
-        }
-        break;
-        
       default:
         console.log(`⚠️ Papa Popup: Unknown trigger type: ${type}, defaulting to 2s delay`);
         setTimeout(() => {
@@ -1067,29 +1056,6 @@
     
     // Also check immediately in case user is already past the threshold
     checkScroll();
-  }
-
-  // Check if current URL matches the pattern
-  function checkUrlMatch(pattern) {
-    const currentUrl = window.location.pathname;
-    
-    // Simple pattern matching - exact match or contains
-    if (pattern === currentUrl) {
-      return true;
-    }
-    
-    // Check if URL contains the pattern
-    if (currentUrl.includes(pattern)) {
-      return true;
-    }
-    
-    // Check for wildcard patterns (basic implementation)
-    if (pattern.includes('*')) {
-      const regex = new RegExp(pattern.replace(/\*/g, '.*'));
-      return regex.test(currentUrl);
-    }
-    
-    return false;
   }
 
   // Show popup with the given config (replaces the old checkPopup logic)

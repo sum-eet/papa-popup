@@ -72,13 +72,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const name = formData.get("name") as string;
     const popupType = formData.get("popupType") as PopupType;
     const targetPages = formData.getAll("targetPages") as string[];
+    const specificUrls = formData.get("specificUrls") as string || "";
     const totalSteps = parseInt(formData.get("totalSteps") as string) || 1;
     
-    // Extract trigger configuration
+    // Extract trigger configuration (URL removed)
     const triggerType = formData.get("triggerType") as string || "delay";
     const triggerValue = formData.get("triggerValue") as string || "2";
     
-    // Validate and create trigger config object
+    // Validate and create trigger config object (URL support removed)
     const validateTriggerConfig = (type: string, value: string) => {
       if (type === 'delay') {
         const numValue = parseInt(value);
@@ -94,12 +95,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
         }
         return numValue;
       }
-      if (type === 'url') {
-        if (!value || value.trim().length === 0) {
-          throw new Error('URL pattern cannot be empty');
-        }
-        return value.trim();
-      }
       throw new Error('Invalid trigger type');
     };
 
@@ -107,13 +102,24 @@ export async function action({ request, params }: ActionFunctionArgs) {
       type: triggerType,
       value: validateTriggerConfig(triggerType, triggerValue)
     };
+    
+    // Create new targeting rules structure
+    const specificUrlsArray = specificUrls.trim() 
+      ? specificUrls.split('\n').map(url => url.trim()).filter(url => url.length > 0)
+      : [];
+    
+    const targetingRules = {
+      pages: targetPages.length > 0 ? targetPages : ['all'],
+      specificUrls: specificUrlsArray,
+      urlPriority: specificUrlsArray.length > 0
+    };
 
     // Update popup
     await prisma.popup.update({
       where: { id: popupId },
       data: {
         name,
-        targetingRules: JSON.stringify({ pages: targetPages.length > 0 ? targetPages : ['all'] }),
+        targetingRules: JSON.stringify(targetingRules),
         triggerConfig: JSON.stringify(triggerConfig),
         popupType,
         totalSteps,
@@ -241,6 +247,7 @@ export default function EditPopup() {
     ? JSON.parse(popup.targetingRules) 
     : popup.targetingRules;
   const existingPages = targetingRules.pages || ['home'];
+  const existingSpecificUrls = (targetingRules.specificUrls || []).join('\n');
 
   // Get existing step data for form pre-population
   const getStepContent = (stepNumber: number, field: string) => {
@@ -262,29 +269,37 @@ export default function EditPopup() {
   const [popupType, setPopupType] = useState<PopupType>(popup.popupType as PopupType);
   const [totalSteps, setTotalSteps] = useState(popup.totalSteps);
   const [targetPages, setTargetPages] = useState<string[]>(existingPages);
+  const [specificUrls, setSpecificUrls] = useState<string>(existingSpecificUrls);
   const [popupName, setPopupName] = useState(popup.name);
   
   // Extract existing trigger config with fallback
   const existingTriggerConfig = (() => {
     try {
       // Handle string JSON
+      let triggerConfig;
       if (typeof popup.triggerConfig === 'string') {
-        return JSON.parse(popup.triggerConfig);
+        triggerConfig = JSON.parse(popup.triggerConfig);
+      } else if (popup.triggerConfig && typeof popup.triggerConfig === 'object') {
+        triggerConfig = popup.triggerConfig;
+      } else {
+        // Fallback for null/undefined/invalid
+        triggerConfig = { type: 'delay', value: 2 };
       }
-      // Handle object
-      if (popup.triggerConfig && typeof popup.triggerConfig === 'object') {
-        return popup.triggerConfig;
+      
+      // Convert legacy URL triggers to delay triggers (URL is now in targeting)
+      if (triggerConfig.type === 'url') {
+        triggerConfig = { type: 'delay', value: 2 };
       }
-      // Fallback for null/undefined/invalid
-      return { type: 'delay', value: 2 };
+      
+      return triggerConfig;
     } catch (error) {
       console.warn('Invalid triggerConfig for popup:', popup.id, error);
       return { type: 'delay', value: 2 };
     }
   })();
   
-  // Trigger configuration state  
-  const [triggerType, setTriggerType] = useState<'delay' | 'scroll' | 'url'>(existingTriggerConfig.type);
+  // Trigger configuration state (URL removed)
+  const [triggerType, setTriggerType] = useState<'delay' | 'scroll'>(existingTriggerConfig.type as 'delay' | 'scroll');
   const [triggerValue, setTriggerValue] = useState<string>(String(existingTriggerConfig.value));
   
   // State for content fields - initialized safely with empty strings
@@ -412,6 +427,17 @@ export default function EditPopup() {
                       </div>
                     </div>
 
+                    <TextField
+                      label="Specific URLs (one per line)"
+                      name="specificUrls"
+                      value={specificUrls}
+                      onChange={setSpecificUrls}
+                      placeholder={"/collections/all\n/products/skincare*\n/blogs/news/*"}
+                      multiline={4}
+                      helpText="Enter specific URL patterns. These will override page type targeting above. Use * for wildcards. Leave empty to only use page types."
+                      autoComplete="off"
+                    />
+
                     <div>
                       <Text variant="bodyMd" as="p">Popup Trigger</Text>
                       <div style={{ marginTop: '8px' }}>
@@ -420,16 +446,14 @@ export default function EditPopup() {
                           name="triggerType"
                           options={[
                             { label: 'Time Delay (seconds)', value: 'delay' },
-                            { label: 'Scroll Percentage (%)', value: 'scroll' },
-                            { label: 'Specific URL/Page', value: 'url' }
+                            { label: 'Scroll Percentage (%)', value: 'scroll' }
                           ]}
                           value={triggerType}
                           onChange={(value) => {
-                            setTriggerType(value as 'delay' | 'scroll' | 'url');
+                            setTriggerType(value as 'delay' | 'scroll');
                             // Reset trigger value when type changes
                             if (value === 'delay') setTriggerValue('2');
                             else if (value === 'scroll') setTriggerValue('50');
-                            else if (value === 'url') setTriggerValue('/');
                           }}
                         />
                         
@@ -437,19 +461,17 @@ export default function EditPopup() {
                           <TextField
                             label={
                               triggerType === 'delay' ? 'Delay in seconds' :
-                              triggerType === 'scroll' ? 'Scroll percentage (0-100)' :
-                              'URL pattern (e.g., /products/skincare)'
+                              'Scroll percentage (0-100)'
                             }
                             name="triggerValue"
                             value={triggerValue}
                             onChange={setTriggerValue}
-                            type={triggerType === 'url' ? 'text' : 'number'}
-                            min={triggerType === 'url' ? undefined : '0'}
+                            type="number"
+                            min="0"
                             max={triggerType === 'scroll' ? '100' : undefined}
                             helpText={
                               triggerType === 'delay' ? 'Popup will show after this many seconds' :
-                              triggerType === 'scroll' ? 'Popup will show after user scrolls this percentage of the page' :
-                              'Popup will show only on pages matching this URL pattern'
+                              'Popup will show after user scrolls this percentage of the page'
                             }
                           />
                         </div>

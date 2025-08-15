@@ -57,14 +57,15 @@ export async function action({ request }: ActionFunctionArgs) {
     const name = formData.get("name") as string;
     const popupType = formData.get("popupType") as PopupType;
     const targetPages = formData.getAll("targetPages") as string[];
+    const specificUrls = formData.get("specificUrls") as string || "";
     const totalSteps = parseInt(formData.get("totalSteps") as string) || 1;
     const createAsActive = formData.get("createAsActive") === "true";
     
-    // Extract trigger configuration
+    // Extract trigger configuration (URL removed)
     const triggerType = formData.get("triggerType") as string || "delay";
     const triggerValue = formData.get("triggerValue") as string || "2";
     
-    // Validate and create trigger config object
+    // Validate and create trigger config object (URL support removed)
     const validateTriggerConfig = (type: string, value: string) => {
       if (type === 'delay') {
         const numValue = parseInt(value);
@@ -80,18 +81,23 @@ export async function action({ request }: ActionFunctionArgs) {
         }
         return numValue;
       }
-      if (type === 'url') {
-        if (!value || value.trim().length === 0) {
-          throw new Error('URL pattern cannot be empty');
-        }
-        return value.trim();
-      }
       throw new Error('Invalid trigger type');
     };
 
     const triggerConfig = {
       type: triggerType,
       value: validateTriggerConfig(triggerType, triggerValue)
+    };
+    
+    // Create new targeting rules structure
+    const specificUrlsArray = specificUrls.trim() 
+      ? specificUrls.split('\n').map(url => url.trim()).filter(url => url.length > 0)
+      : [];
+    
+    const targetingRules = {
+      pages: targetPages.length > 0 ? targetPages : ['all'],
+      specificUrls: specificUrlsArray,
+      urlPriority: specificUrlsArray.length > 0
     };
 
     console.log("🚀 Creating popup:", { name, popupType, totalSteps, createAsActive, triggerConfig });
@@ -164,7 +170,7 @@ export async function action({ request }: ActionFunctionArgs) {
         name,
         status: createAsActive ? 'ACTIVE' : 'DRAFT',
         priority: 1,
-        targetingRules: JSON.stringify({ pages: targetPages.length > 0 ? targetPages : ['all'] }),
+        targetingRules: JSON.stringify(targetingRules),
         triggerConfig: JSON.stringify(triggerConfig),
         popupType,
         totalSteps,
@@ -337,10 +343,11 @@ export default function NewPopup() {
   const [popupType, setPopupType] = useState<PopupType>(templateDefaults.popupType);
   const [totalSteps, setTotalSteps] = useState(templateDefaults.totalSteps);
   const [targetPages, setTargetPages] = useState<string[]>(['home']);
+  const [specificUrls, setSpecificUrls] = useState<string>('');
   const [createAsActive, setCreateAsActive] = useState(false);
   
-  // Trigger configuration state
-  const [triggerType, setTriggerType] = useState<'delay' | 'scroll' | 'url'>('delay');
+  // Trigger configuration state (URL removed)
+  const [triggerType, setTriggerType] = useState<'delay' | 'scroll'>('delay');
   const [triggerValue, setTriggerValue] = useState<string>('2');
   
   // Form field states
@@ -439,6 +446,17 @@ export default function NewPopup() {
                       </div>
                     </div>
 
+                    <TextField
+                      label="Specific URLs (one per line)"
+                      name="specificUrls"
+                      value={specificUrls}
+                      onChange={setSpecificUrls}
+                      placeholder={"/collections/all\n/products/skincare*\n/blogs/news/*"}
+                      multiline={4}
+                      helpText="Enter specific URL patterns. These will override page type targeting above. Use * for wildcards. Leave empty to only use page types."
+                      autoComplete="off"
+                    />
+
                     <div>
                       <Text variant="bodyMd" as="p">Popup Trigger</Text>
                       <div style={{ marginTop: '8px' }}>
@@ -447,16 +465,14 @@ export default function NewPopup() {
                           name="triggerType"
                           options={[
                             { label: 'Time Delay (seconds)', value: 'delay' },
-                            { label: 'Scroll Percentage (%)', value: 'scroll' },
-                            { label: 'Specific URL/Page', value: 'url' }
+                            { label: 'Scroll Percentage (%)', value: 'scroll' }
                           ]}
                           value={triggerType}
                           onChange={(value) => {
-                            setTriggerType(value as 'delay' | 'scroll' | 'url');
+                            setTriggerType(value as 'delay' | 'scroll');
                             // Reset trigger value when type changes
                             if (value === 'delay') setTriggerValue('2');
                             else if (value === 'scroll') setTriggerValue('50');
-                            else if (value === 'url') setTriggerValue('/');
                           }}
                         />
                         
@@ -464,19 +480,17 @@ export default function NewPopup() {
                           <TextField
                             label={
                               triggerType === 'delay' ? 'Delay in seconds' :
-                              triggerType === 'scroll' ? 'Scroll percentage (0-100)' :
-                              'URL pattern (e.g., /products/skincare)'
+                              'Scroll percentage (0-100)'
                             }
                             name="triggerValue"
                             value={triggerValue}
                             onChange={setTriggerValue}
-                            type={triggerType === 'url' ? 'text' : 'number'}
-                            min={triggerType === 'url' ? undefined : '0'}
+                            type="number"
+                            min="0"
                             max={triggerType === 'scroll' ? '100' : undefined}
                             helpText={
                               triggerType === 'delay' ? 'Popup will show after this many seconds' :
-                              triggerType === 'scroll' ? 'Popup will show after user scrolls this percentage of the page' :
-                              'Popup will show only on pages matching this URL pattern'
+                              'Popup will show after user scrolls this percentage of the page'
                             }
                           />
                         </div>

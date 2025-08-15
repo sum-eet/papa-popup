@@ -103,16 +103,57 @@ async function handleMultiPopupCheck(shopDomain: string, pageType: string, pageU
   // Find the highest priority popup that matches the current page
   let selectedPopup = null;
   
+  // Helper function to check if URL matches a pattern
+  function checkUrlMatch(pattern, currentUrl) {
+    // Simple pattern matching with wildcard support
+    if (pattern === currentUrl) return true;
+    if (pattern.endsWith('*')) {
+      const prefix = pattern.slice(0, -1);
+      return currentUrl.startsWith(prefix);
+    }
+    if (pattern.startsWith('*')) {
+      const suffix = pattern.slice(1);
+      return currentUrl.endsWith(suffix);
+    }
+    return currentUrl.includes(pattern);
+  }
+  
+  // First pass: Look for popups with specific URL targeting that match current page
   for (const popup of shop.popups) {
     const targetingRules = typeof popup.targetingRules === 'string' 
       ? JSON.parse(popup.targetingRules) 
       : popup.targetingRules;
     
-    const targetPages = targetingRules.pages || ['all'];
+    const specificUrls = targetingRules.specificUrls || [];
+    const urlPriority = targetingRules.urlPriority || false;
     
-    if (targetPages.includes('all') || targetPages.includes(pageType)) {
-      selectedPopup = popup;
-      break; // Take the first (highest priority) match
+    // If this popup has specific URLs and URL priority is enabled
+    if (urlPriority && specificUrls.length > 0) {
+      for (const urlPattern of specificUrls) {
+        if (checkUrlMatch(urlPattern, pageUrl)) {
+          selectedPopup = popup;
+          console.log(`🎯 Found specific URL match: ${urlPattern} matches ${pageUrl}`);
+          break;
+        }
+      }
+      if (selectedPopup) break; // Found a specific URL match, stop looking
+    }
+  }
+  
+  // Second pass: If no specific URL match found, look for page type matches
+  if (!selectedPopup) {
+    for (const popup of shop.popups) {
+      const targetingRules = typeof popup.targetingRules === 'string' 
+        ? JSON.parse(popup.targetingRules) 
+        : popup.targetingRules;
+      
+      const targetPages = targetingRules.pages || ['all'];
+      
+      if (targetPages.includes('all') || targetPages.includes(pageType)) {
+        selectedPopup = popup;
+        console.log(`📄 Found page type match: ${pageType}`);
+        break; // Take the first (highest priority) match
+      }
     }
   }
 
@@ -131,15 +172,23 @@ async function handleMultiPopupCheck(shopDomain: string, pageType: string, pageU
     triggerConfig: (() => {
       try {
         // Handle string JSON
+        let triggerConfig;
         if (typeof selectedPopup.triggerConfig === 'string') {
-          return JSON.parse(selectedPopup.triggerConfig);
+          triggerConfig = JSON.parse(selectedPopup.triggerConfig);
+        } else if (selectedPopup.triggerConfig && typeof selectedPopup.triggerConfig === 'object') {
+          triggerConfig = selectedPopup.triggerConfig;
+        } else {
+          // Fallback for null/undefined/invalid
+          triggerConfig = { type: 'delay', value: 2 };
         }
-        // Handle object
-        if (selectedPopup.triggerConfig && typeof selectedPopup.triggerConfig === 'object') {
-          return selectedPopup.triggerConfig;
+        
+        // Remove URL trigger type as it's now handled in targeting
+        if (triggerConfig.type === 'url') {
+          console.log('⚠️ Found legacy URL trigger, converting to delay trigger');
+          triggerConfig = { type: 'delay', value: 2 };
         }
-        // Fallback for null/undefined/invalid
-        return { type: 'delay', value: 2 };
+        
+        return triggerConfig;
       } catch (error) {
         console.warn('Invalid triggerConfig for popup:', selectedPopup.id, error);
         return { type: 'delay', value: 2 };
