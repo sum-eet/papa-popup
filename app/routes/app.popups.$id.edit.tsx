@@ -78,12 +78,34 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const triggerType = formData.get("triggerType") as string || "delay";
     const triggerValue = formData.get("triggerValue") as string || "2";
     
-    // Create trigger config object
+    // Validate and create trigger config object
+    const validateTriggerConfig = (type: string, value: string) => {
+      if (type === 'delay') {
+        const numValue = parseInt(value);
+        if (isNaN(numValue) || numValue < 0 || numValue > 300) {
+          throw new Error('Delay must be between 0 and 300 seconds');
+        }
+        return numValue;
+      }
+      if (type === 'scroll') {
+        const numValue = parseInt(value);
+        if (isNaN(numValue) || numValue < 0 || numValue > 100) {
+          throw new Error('Scroll percentage must be between 0 and 100');
+        }
+        return numValue;
+      }
+      if (type === 'url') {
+        if (!value || value.trim().length === 0) {
+          throw new Error('URL pattern cannot be empty');
+        }
+        return value.trim();
+      }
+      throw new Error('Invalid trigger type');
+    };
+
     const triggerConfig = {
       type: triggerType,
-      value: triggerType === "delay" || triggerType === "scroll" 
-        ? parseInt(triggerValue) || 2 
-        : triggerValue || "/"
+      value: validateTriggerConfig(triggerType, triggerValue)
     };
 
     // Update popup
@@ -242,10 +264,24 @@ export default function EditPopup() {
   const [targetPages, setTargetPages] = useState<string[]>(existingPages);
   const [popupName, setPopupName] = useState(popup.name);
   
-  // Extract existing trigger config
-  const existingTriggerConfig = typeof popup.triggerConfig === 'string' 
-    ? JSON.parse(popup.triggerConfig) 
-    : popup.triggerConfig || { type: 'delay', value: 2 };
+  // Extract existing trigger config with fallback
+  const existingTriggerConfig = (() => {
+    try {
+      // Handle string JSON
+      if (typeof popup.triggerConfig === 'string') {
+        return JSON.parse(popup.triggerConfig);
+      }
+      // Handle object
+      if (popup.triggerConfig && typeof popup.triggerConfig === 'object') {
+        return popup.triggerConfig;
+      }
+      // Fallback for null/undefined/invalid
+      return { type: 'delay', value: 2 };
+    } catch (error) {
+      console.warn('Invalid triggerConfig for popup:', popup.id, error);
+      return { type: 'delay', value: 2 };
+    }
+  })();
   
   // Trigger configuration state  
   const [triggerType, setTriggerType] = useState<'delay' | 'scroll' | 'url'>(existingTriggerConfig.type);

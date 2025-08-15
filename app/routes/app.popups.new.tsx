@@ -64,12 +64,34 @@ export async function action({ request }: ActionFunctionArgs) {
     const triggerType = formData.get("triggerType") as string || "delay";
     const triggerValue = formData.get("triggerValue") as string || "2";
     
-    // Create trigger config object
+    // Validate and create trigger config object
+    const validateTriggerConfig = (type: string, value: string) => {
+      if (type === 'delay') {
+        const numValue = parseInt(value);
+        if (isNaN(numValue) || numValue < 0 || numValue > 300) {
+          throw new Error('Delay must be between 0 and 300 seconds');
+        }
+        return numValue;
+      }
+      if (type === 'scroll') {
+        const numValue = parseInt(value);
+        if (isNaN(numValue) || numValue < 0 || numValue > 100) {
+          throw new Error('Scroll percentage must be between 0 and 100');
+        }
+        return numValue;
+      }
+      if (type === 'url') {
+        if (!value || value.trim().length === 0) {
+          throw new Error('URL pattern cannot be empty');
+        }
+        return value.trim();
+      }
+      throw new Error('Invalid trigger type');
+    };
+
     const triggerConfig = {
       type: triggerType,
-      value: triggerType === "delay" || triggerType === "scroll" 
-        ? parseInt(triggerValue) || 2 
-        : triggerValue || "/"
+      value: validateTriggerConfig(triggerType, triggerValue)
     };
 
     console.log("🚀 Creating popup:", { name, popupType, totalSteps, createAsActive, triggerConfig });

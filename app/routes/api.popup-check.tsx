@@ -128,9 +128,23 @@ async function handleMultiPopupCheck(shopDomain: string, pageType: string, pageU
     popupId: selectedPopup.id,
     popupType: selectedPopup.popupType,
     totalSteps: selectedPopup.totalSteps,
-    triggerConfig: typeof selectedPopup.triggerConfig === 'string' 
-      ? JSON.parse(selectedPopup.triggerConfig) 
-      : selectedPopup.triggerConfig,
+    triggerConfig: (() => {
+      try {
+        // Handle string JSON
+        if (typeof selectedPopup.triggerConfig === 'string') {
+          return JSON.parse(selectedPopup.triggerConfig);
+        }
+        // Handle object
+        if (selectedPopup.triggerConfig && typeof selectedPopup.triggerConfig === 'object') {
+          return selectedPopup.triggerConfig;
+        }
+        // Fallback for null/undefined/invalid
+        return { type: 'delay', value: 2 };
+      } catch (error) {
+        console.warn('Invalid triggerConfig for popup:', selectedPopup.id, error);
+        return { type: 'delay', value: 2 };
+      }
+    })(),
     steps: selectedPopup.steps.map(step => ({
       stepNumber: step.stepNumber,
       stepType: step.stepType,
