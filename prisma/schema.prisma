@@ -121,6 +121,9 @@ model Popup {
   // Content
   steps           PopupStep[]
   sessions        CustomerSession[]
+
+  // Design Customization
+  design          PopupDesign?
   
   // Tracking
   scriptTagId     String?
@@ -192,6 +195,48 @@ model CustomerSession {
   @@index([sessionToken])
   @@index([shopId, createdAt])
   @@index([popupId])
+}
+
+model PopupDesign {
+  id              String   @id @default(uuid())
+  popupId         String   @unique
+  popup           Popup    @relation(fields: [popupId], references: [id])
+
+  // Theme Integration
+  themeId         String?
+  autoThemeSync   Boolean  @default(true)
+  lastThemeSync   DateTime?
+
+  // Color Scheme
+  primaryColor    String   @default("#007cba")
+  backgroundColor String   @default("#ffffff")
+  textColor       String   @default("#333333")
+  borderColor     String   @default("#e9ecef")
+  overlayColor    String   @default("rgba(0, 0, 0, 0.5)")
+
+  // Typography
+  fontFamily      String   @default("-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif")
+  headingFontSize String   @default("24px")
+  bodyFontSize    String   @default("16px")
+  buttonFontSize  String   @default("16px")
+  fontWeight      String   @default("normal")
+
+  // Layout & Spacing
+  borderRadius    String   @default("12px")
+  padding         String   @default("40px")
+  maxWidth        String   @default("400px")
+  spacing         String   @default("16px")
+
+  // Advanced Styling
+  customCSS       String?
+  cssVariables    Json     @default("{}")
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([popupId])
+  @@index([themeId])
 }
 
 // ENUMS
