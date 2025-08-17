@@ -30,42 +30,83 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     throw new Response("Popup ID is required", { status: 400 });
   }
 
-  // Get popup and its design
-  const popup = await prisma.popup.findFirst({
-    where: {
-      id: id,
-      shop: session.shop
-    },
-    include: {
-      design: true
-    }
-  });
-
-  if (!popup) {
-    throw new Response("Popup not found", { status: 404 });
-  }
-
-  // Get theme analysis for suggestions
-  let themeAnalysis = null;
   try {
-    const themeResponse = await fetch(`${process.env.SHOPIFY_APP_URL}/api/theme/analyze`, {
-      headers: {
-        'X-Shopify-Shop-Domain': session.shop,
-        'X-Shopify-Access-Token': session.accessToken,
+    // Get popup first
+    const popup = await prisma.popup.findFirst({
+      where: {
+        id: id,
+        shop: session.shop
       }
     });
-    if (themeResponse.ok) {
-      themeAnalysis = await themeResponse.json();
-    }
-  } catch (error) {
-    console.warn('Failed to fetch theme analysis:', error);
-  }
 
-  return json({
-    popup,
-    design: popup.design,
-    themeAnalysis
-  });
+    if (!popup) {
+      throw new Response("Popup not found", { status: 404 });
+    }
+
+    // Try to get design, but handle case where PopupDesign table doesn't exist yet
+    let design = null;
+    try {
+      design = await prisma.popupDesign.findUnique({
+        where: { popupId: id }
+      });
+    } catch (designError) {
+      console.warn('PopupDesign table not found or accessible:', designError);
+      // Design will remain null, we'll handle this in the component
+    }
+
+    // Attach design to popup object for compatibility
+    const popupWithDesign = {
+      ...popup,
+      design
+    };
+
+    // Get theme analysis for suggestions
+    let themeAnalysis = null;
+    try {
+      const themeResponse = await fetch(`${process.env.SHOPIFY_APP_URL}/api/theme/analyze`, {
+        headers: {
+          'X-Shopify-Shop-Domain': session.shop,
+          'X-Shopify-Access-Token': session.accessToken,
+        }
+      });
+      if (themeResponse.ok) {
+        themeAnalysis = await themeResponse.json();
+      }
+    } catch (error) {
+      console.warn('Failed to fetch theme analysis:', error);
+    }
+
+    return json({
+      popup: popupWithDesign,
+      design,
+      themeAnalysis
+    });
+  } catch (error) {
+    console.error('Error in design loader:', error);
+    // Return basic popup data if there are errors
+    try {
+      const popup = await prisma.popup.findFirst({
+        where: {
+          id: id,
+          shop: session.shop
+        }
+      });
+      
+      if (!popup) {
+        throw new Response("Popup not found", { status: 404 });
+      }
+
+      return json({
+        popup,
+        design: null,
+        themeAnalysis: null,
+        error: "Could not load design data. This may be due to database migration pending."
+      });
+    } catch (fallbackError) {
+      console.error('Fallback error:', fallbackError);
+      throw new Response("Unable to load popup data", { status: 500 });
+    }
+  }
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -115,7 +156,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return json({ success: true, message: "Design saved successfully!" });
     } catch (error) {
       console.error("Error saving design:", error);
-      return json({ error: "Failed to save design" }, { status: 500 });
+      
+      // Check if it's a table/schema error
+      if (error instanceof Error && (
+        error.message.includes('table') || 
+        error.message.includes('relation') ||
+        error.message.includes('PopupDesign')
+      )) {
+        return json({ 
+          error: "Database migration pending. Please apply the PopupDesign table migration to save design settings." 
+        }, { status: 500 });
+      }
+      
+      return json({ error: "Failed to save design. Please try again." }, { status: 500 });
     }
   }
 
@@ -155,7 +208,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return json({ success: true, message: "Theme colors applied successfully!" });
     } catch (error) {
       console.error("Error applying theme:", error);
-      return json({ error: "Failed to apply theme colors" }, { status: 500 });
+      
+      // Check if it's a table/schema error
+      if (error instanceof Error && (
+        error.message.includes('table') || 
+        error.message.includes('relation') ||
+        error.message.includes('PopupDesign')
+      )) {
+        return json({ 
+          error: "Database migration pending. Please apply the PopupDesign table migration to use theme integration." 
+        }, { status: 500 });
+      }
+      
+      return json({ error: "Failed to apply theme colors. Please try again." }, { status: 500 });
     }
   }
 
@@ -163,12 +228,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function PopupDesign() {
-  const { popup, design, themeAnalysis } = useLoaderData<typeof loader>();
+  const loaderData = useLoaderData<typeof loader>();
+  const { popup, design, themeAnalysis } = loaderData;
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const fetcher = useFetcher();
 
   const isLoading = navigation.state === "submitting" || fetcher.state === "submitting";
+
+  // Check if there was a loader error
+  const hasError = 'error' in loaderData;
 
   // State for design values
   const [designValues, setDesignValues] = useState({
@@ -219,6 +288,19 @@ export default function PopupDesign() {
       }}
     >
       <Layout>
+        {hasError && (
+          <Layout.Section>
+            <Banner status="critical">
+              {loaderData.error}
+              <br />
+              <Text variant="bodySm" as="p">
+                The design customization feature requires a database migration. 
+                Please contact support or apply the PopupDesign table migration.
+              </Text>
+            </Banner>
+          </Layout.Section>
+        )}
+
         {actionData?.error && (
           <Layout.Section>
             <Banner status="critical">{actionData.error}</Banner>
