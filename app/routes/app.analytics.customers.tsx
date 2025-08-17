@@ -155,7 +155,7 @@ export default function AnalyticsCustomers() {
     <Text key={`time-${customer.id}`} variant="bodyMd" as="p">
       {customer.timeSpent ? `${Math.round(customer.timeSpent / 60)}m` : '-'}
     </Text>,
-    <Badge key={`status-${customer.id}`} tone={customer.emailProvided ? 'success' : 'attention'}>
+    <Badge key={`status-${customer.id}`} tone={customer.emailProvided ? 'success' : 'warning'}>
       {customer.emailProvided ? 'Converted' : 'Browsing'}
     </Badge>,
     <Text key={`date-${customer.id}`} variant="bodySm" as="p" tone="subdued">
@@ -319,7 +319,7 @@ export default function AnalyticsCustomers() {
                       <Text variant="bodyMd" as="p">
                         {customer.totalInteractions} interactions
                       </Text>
-                      <Badge tone={customer.emailProvided ? 'success' : 'attention'}>
+                      <Badge tone={customer.emailProvided ? 'success' : 'warning'}>
                         {customer.emailProvided ? 'Converted' : 'Engaged'}
                       </Badge>
                     </div>
@@ -341,7 +341,6 @@ export default function AnalyticsCustomers() {
                 columnContentTypes={['text', 'text', 'numeric', 'text', 'text', 'text']}
                 headings={['Email', 'Source Popup', 'Interactions', 'Time Spent', 'Status', 'Date']}
                 rows={customersTableRows}
-                hasZebraStriping
               />
             ) : (
               <div style={{ padding: '20px' }}>

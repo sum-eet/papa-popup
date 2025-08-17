@@ -240,7 +240,7 @@ export default function AnalyticsFunnels() {
           {popup.popupType.replace('_', ' ').toLowerCase()}
         </Text>
       </div>,
-      <Badge key={`status-${popup.id}`} tone={popup.status === 'ACTIVE' ? 'success' : 'attention'}>
+      <Badge key={`status-${popup.id}`} tone={popup.status === 'ACTIVE' ? 'success' : 'warning'}>
         {popup.status.toLowerCase()}
       </Badge>,
       <Text key={`impressions-${popup.id}`} variant="bodyMd" as="p">
@@ -432,7 +432,6 @@ export default function AnalyticsFunnels() {
                 columnContentTypes={['text', 'text', 'numeric', 'numeric', 'numeric', 'numeric', 'numeric', 'text']}
                 headings={['Popup Name', 'Status', 'Impressions', 'Interactions', 'Completions', 'Engagement %', 'Completion %', 'Actions']}
                 rows={funnelTableRows}
-                hasZebraStriping
               />
             ) : (
               <div style={{ padding: '20px' }}>

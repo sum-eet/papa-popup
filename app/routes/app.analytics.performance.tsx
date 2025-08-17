@@ -250,7 +250,7 @@ export default function AnalyticsPerformance() {
           {popup.popupType.replace('_', ' ').toLowerCase()}
         </Text>
       </div>,
-      <Badge key={`status-${popup.id}`} tone={popup.status === 'ACTIVE' ? 'success' : 'attention'}>
+      <Badge key={`status-${popup.id}`} tone={popup.status === 'ACTIVE' ? 'success' : 'warning'}>
         {popup.status.toLowerCase()}
       </Badge>,
       <Text key={`impressions-${popup.id}`} variant="bodyMd" as="p">
@@ -424,7 +424,6 @@ export default function AnalyticsPerformance() {
                 columnContentTypes={['text', 'text', 'numeric', 'numeric', 'numeric', 'text']}
                 headings={['Popup Name', 'Status', 'Impressions', 'Emails', 'Conversion %', 'Actions']}
                 rows={performanceTableRows}
-                hasZebraStriping
               />
             ) : (
               <div style={{ padding: '20px' }}>
