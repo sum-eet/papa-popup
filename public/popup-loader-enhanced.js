@@ -21,6 +21,37 @@
     popup: null
   };
 
+  // Analytics tracking
+  function trackAnalyticsEvent(eventType, metadata = {}) {
+    try {
+      const eventData = {
+        eventType,
+        shopDomain: window.Shopify?.shop || 'unknown',
+        sessionToken: currentPopupState.sessionToken,
+        popupId: currentPopupState.popup?.id,
+        stepNumber: currentPopupState.currentStep,
+        metadata,
+        pageUrl: window.location.href,
+        userAgent: navigator.userAgent
+      };
+
+      // Send to analytics API
+      fetch(`${APP_URL}/api/analytics/events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventData)
+      }).catch(error => {
+        console.warn('Papa Popup: Analytics tracking failed:', error);
+      });
+      
+      console.log('📊 Papa Popup: Tracked event:', eventType, metadata);
+    } catch (error) {
+      console.warn('Papa Popup: Analytics error:', error);
+    }
+  }
+
   // Track loaded CSS to avoid duplicates
   let loadedPopupCSS = null;
   
@@ -162,6 +193,19 @@
     `;
 
     document.body.insertAdjacentHTML('beforeend', popupHTML);
+    
+    // Track impression and step view
+    trackAnalyticsEvent('impression', {
+      popupType: currentPopupState.popupType,
+      totalSteps: currentPopupState.totalSteps,
+      pageType: getPageType()
+    });
+    
+    trackAnalyticsEvent('step_view', {
+      stepNumber: currentPopupState.currentStep,
+      stepType: currentStepData?.stepType
+    });
+    
     setupMultiStepEvents();
     console.log('✅ Papa Popup: Multi-step popup rendered successfully!');
   }
@@ -619,6 +663,13 @@
     `;
 
     document.body.insertAdjacentHTML('beforeend', popupHTML);
+    
+    // Track impression
+    trackAnalyticsEvent('impression', {
+      popupType: 'legacy',
+      pageType: getPageType()
+    });
+    
     setupLegacyPopupEvents();
     console.log('✅ Papa Popup: Legacy popup rendered successfully!');
   }
@@ -634,6 +685,12 @@
     // Close popup function
     function closePopup() {
       if (overlay && overlay.parentNode) {
+        // Track close event
+        trackAnalyticsEvent('close', {
+          popupType: 'legacy',
+          method: 'manual_close'
+        });
+        
         overlay.remove();
       }
       sessionStorage.setItem(POPUP_SHOWN_KEY, 'true');
@@ -673,8 +730,20 @@
         submitBtn.disabled = true;
 
         try {
+          // Track email submission attempt
+          trackAnalyticsEvent('button_click', {
+            buttonType: 'email_submit',
+            email: email
+          });
+          
           const success = await submitEmail(email);
           if (success) {
+            // Track successful completion
+            trackAnalyticsEvent('complete', {
+              popupType: 'legacy',
+              email: email
+            });
+            
             showSuccessMessage();
             setTimeout(closePopup, 3000);
           } else {

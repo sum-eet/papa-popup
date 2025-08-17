@@ -259,7 +259,7 @@ export default function PopupDesign() {
 
   const handleColorPickerChange = (color: any, field: string) => {
     const hex = hsbToHex(color.hue, color.saturation, color.brightness);
-    handleValueChange(field, hex);
+    setDesignValues(prev => ({ ...prev, [field]: hex }));
   };
 
   // Auto-hide success message

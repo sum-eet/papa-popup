@@ -47,8 +47,13 @@ model Shop {
   emails      CollectedEmail[]
   
   // New multi-popup system
-  popups          Popup[]
+  popups            Popup[]
   customerSessions CustomerSession[]
+  
+  // Analytics
+  popupAnalytics    PopupAnalytics[]
+  customerAnalytics CustomerAnalytics[]
+  shopifyCustomerSyncs ShopifyCustomerSync[]
 }
 
 model PopupConfig {
@@ -82,6 +87,9 @@ model CollectedEmail {
   // Quiz data
   quizResponses     Json?    // Copy of session responses
   discountUsed      String?  // Which discount they got
+  
+  // Analytics integration
+  shopifyCustomerSync ShopifyCustomerSync?
 
   @@index([shopId])
   @@index([email])
@@ -124,6 +132,10 @@ model Popup {
 
   // Design Customization
   design          PopupDesign?
+  
+  // Analytics
+  analytics       PopupAnalytics[]
+  customerAnalytics CustomerAnalytics[]
   
   // Tracking
   scriptTagId     String?
@@ -265,4 +277,95 @@ enum DiscountType {
   FIXED           // Same discount for everyone
   LOGIC_BASED     // Based on quiz completion
   RANDOMIZED      // Random selection
+}
+
+// ANALYTICS MODELS
+
+model PopupAnalytics {
+  id            String   @id @default(uuid())
+  shopId        String
+  shop          Shop     @relation(fields: [shopId], references: [id])
+  popupId       String?
+  popup         Popup?   @relation(fields: [popupId], references: [id])
+  
+  // Event tracking
+  eventType     String   // "impression", "click", "close", "complete", "step_view", "step_complete"
+  sessionToken  String?
+  stepNumber    Int?
+  
+  // User context
+  ipAddress     String?
+  userAgent     String?
+  pageUrl       String?
+  
+  // Event metadata
+  metadata      Json?    // Additional tracking data, button clicked, option selected, etc.
+  
+  // Timing
+  createdAt     DateTime @default(now())
+  
+  @@index([popupId, eventType])
+  @@index([shopId, eventType])
+  @@index([sessionToken])
+  @@index([createdAt])
+}
+
+model CustomerAnalytics {
+  id                String   @id @default(uuid())
+  shopId            String
+  shop              Shop     @relation(fields: [shopId], references: [id])
+  email             String?
+  sessionToken      String   @unique
+  
+  // Journey tracking
+  customerJourney   Json     @default("[]")  // step-by-step journey data
+  conversionFunnel  Json     @default("{}")  // funnel analysis data
+  totalInteractions Int      @default(0)
+  timeSpent         Int?     // Total time in seconds
+  
+  // Conversion tracking
+  emailProvided     Boolean  @default(false)
+  discountClaimed   Boolean  @default(false)
+  shopifyCustomerId String?  // Link to Shopify customer record
+  
+  // Attribution
+  popupId           String?
+  popup             Popup?   @relation(fields: [popupId], references: [id])
+  
+  // Metadata
+  firstVisit        DateTime
+  lastActivity      DateTime @updatedAt
+  createdAt         DateTime @default(now())
+  
+  @@index([shopId, email])
+  @@index([sessionToken])
+  @@index([popupId])
+  @@index([createdAt])
+}
+
+model ShopifyCustomerSync {
+  id                String   @id @default(uuid())
+  shopId            String
+  shop              Shop     @relation(fields: [shopId], references: [id])
+  
+  // Papa Popup data
+  collectedEmailId  String   @unique
+  collectedEmail    CollectedEmail @relation(fields: [collectedEmailId], references: [id])
+  
+  // Shopify data
+  shopifyCustomerId String?
+  syncStatus        String   @default("pending") // "pending", "synced", "failed", "duplicate"
+  syncAttempts      Int      @default(0)
+  lastSyncAttempt   DateTime?
+  syncError         String?
+  
+  // Customer tags applied
+  appliedTags       Json     @default("[]")
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([shopId, syncStatus])
+  @@index([shopifyCustomerId])
+  @@index([collectedEmailId])
 }
