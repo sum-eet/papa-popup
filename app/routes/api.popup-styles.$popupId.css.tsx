@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { db } from "../db.server";
+import prisma from "../db.server";
 import { generatePopupCSS, generateCSSETag } from "../utils/css-generator";
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
@@ -11,7 +11,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
     }
 
     // Get PopupDesign from database
-    const popupDesign = await db.popupDesign.findUnique({
+    const popupDesign = await prisma.popupDesign.findUnique({
       where: { popupId: popupId }
     });
 

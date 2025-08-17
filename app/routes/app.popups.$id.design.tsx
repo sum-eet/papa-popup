@@ -2,7 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json, redirect } from "@remix-run/node";
 import { useActionData, useLoaderData, Form, useNavigation, useFetcher } from "@remix-run/react";
 import { authenticate } from "../shopify.server";
-import { db } from "../db.server";
+import prisma from "../db.server";
 import {
   Page,
   Layout,
@@ -31,7 +31,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   // Get popup and its design
-  const popup = await db.popup.findFirst({
+  const popup = await prisma.popup.findFirst({
     where: {
       id: id,
       shop: session.shop
@@ -100,7 +100,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       };
 
       // Update or create design
-      await db.popupDesign.upsert({
+      await prisma.popupDesign.upsert({
         where: { popupId: id },
         update: {
           ...designData,
@@ -123,7 +123,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const themeColors = JSON.parse(formData.get("themeColors") as string);
     
     try {
-      await db.popupDesign.upsert({
+      await prisma.popupDesign.upsert({
         where: { popupId: id },
         update: {
           primaryColor: themeColors.primary || "#007cba",
