@@ -31,11 +31,15 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   try {
-    // Get popup first - simplified query without relations
+    // Get popup with correct relational query structure
     const popup = await prisma.popup.findFirst({
       where: {
         id: id,
-        shop: session.shop
+        shop: { domain: session.shop },
+        isDeleted: false
+      },
+      include: {
+        design: true
       }
     });
 
@@ -43,43 +47,31 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       throw new Response("Popup not found", { status: 404 });
     }
 
-    // Skip PopupDesign queries entirely for now - use defaults
-    const design = null;
-
-    // Skip theme analysis for now to avoid additional failure points
-    const themeAnalysis = null;
+    // Get theme analysis for suggestions
+    let themeAnalysis = null;
+    try {
+      const themeResponse = await fetch(`${process.env.SHOPIFY_APP_URL}/api/theme/analyze`, {
+        headers: {
+          'X-Shopify-Shop-Domain': session.shop,
+          'X-Shopify-Access-Token': session.accessToken,
+        }
+      });
+      if (themeResponse.ok) {
+        themeAnalysis = await themeResponse.json();
+      }
+    } catch (error) {
+      console.warn('Failed to fetch theme analysis:', error);
+    }
 
     return json({
       popup,
-      design,
-      themeAnalysis,
-      migrationPending: true,
-      message: "Design customization is temporarily using default values. Database migration pending."
+      design: popup.design,
+      themeAnalysis
     });
 
   } catch (error) {
     console.error('Error in design loader:', error);
-    
-    // More detailed error logging
-    const errorDetails = {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      timestamp: new Date().toISOString(),
-      popupId: id,
-      shop: session.shop
-    };
-    
-    console.error('Detailed error info:', errorDetails);
-    
-    throw new Response(JSON.stringify({
-      error: "Failed to load popup data",
-      details: errorDetails
-    }), { 
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+    throw new Response("Failed to load popup data", { status: 500 });
   }
 }
 
@@ -94,27 +86,96 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent");
 
-  // Temporarily disable all save functionality until migration is applied
-  if (intent === "save" || intent === "apply-theme") {
-    return json({ 
-      error: "Design saving is temporarily disabled. Database migration pending for PopupDesign table." 
-    }, { status: 503 });
+  if (intent === "save") {
+    try {
+      const designData = {
+        primaryColor: formData.get("primaryColor") as string,
+        backgroundColor: formData.get("backgroundColor") as string,
+        textColor: formData.get("textColor") as string,
+        borderColor: formData.get("borderColor") as string,
+        overlayColor: formData.get("overlayColor") as string,
+        fontFamily: formData.get("fontFamily") as string,
+        headingFontSize: formData.get("headingFontSize") as string,
+        bodyFontSize: formData.get("bodyFontSize") as string,
+        buttonFontSize: formData.get("buttonFontSize") as string,
+        fontWeight: formData.get("fontWeight") as string,
+        borderRadius: formData.get("borderRadius") as string,
+        padding: formData.get("padding") as string,
+        maxWidth: formData.get("maxWidth") as string,
+        spacing: formData.get("spacing") as string,
+        customCSS: formData.get("customCSS") as string || null,
+      };
+
+      // Update or create design
+      await prisma.popupDesign.upsert({
+        where: { popupId: id },
+        update: {
+          ...designData,
+          updatedAt: new Date()
+        },
+        create: {
+          popupId: id,
+          ...designData
+        }
+      });
+
+      return json({ success: true, message: "Design saved successfully!" });
+    } catch (error) {
+      console.error("Error saving design:", error);
+      return json({ error: "Failed to save design. Please try again." }, { status: 500 });
+    }
+  }
+
+  if (intent === "apply-theme") {
+    const themeColors = JSON.parse(formData.get("themeColors") as string);
+    
+    try {
+      await prisma.popupDesign.upsert({
+        where: { popupId: id },
+        update: {
+          primaryColor: themeColors.primary || "#007cba",
+          backgroundColor: themeColors.background || "#ffffff",
+          textColor: themeColors.text || "#333333",
+          borderColor: themeColors.border || "#e9ecef",
+          fontFamily: themeColors.bodyFont || "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+          updatedAt: new Date()
+        },
+        create: {
+          popupId: id,
+          primaryColor: themeColors.primary || "#007cba",
+          backgroundColor: themeColors.background || "#ffffff",
+          textColor: themeColors.text || "#333333",
+          borderColor: themeColors.border || "#e9ecef",
+          overlayColor: "rgba(0, 0, 0, 0.5)",
+          fontFamily: themeColors.bodyFont || "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+          headingFontSize: "24px",
+          bodyFontSize: "16px",
+          buttonFontSize: "16px",
+          fontWeight: "400",
+          borderRadius: "12px",
+          padding: "40px",
+          maxWidth: "500px",
+          spacing: "16px"
+        }
+      });
+
+      return json({ success: true, message: "Theme colors applied successfully!" });
+    } catch (error) {
+      console.error("Error applying theme:", error);
+      return json({ error: "Failed to apply theme colors. Please try again." }, { status: 500 });
+    }
   }
 
   return json({ error: "Invalid action" }, { status: 400 });
 }
 
 export default function PopupDesign() {
-  const loaderData = useLoaderData<typeof loader>();
-  const { popup, design, themeAnalysis, migrationPending, message } = loaderData;
+  const { popup, design, themeAnalysis } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const fetcher = useFetcher();
 
   const isLoading = navigation.state === "submitting" || fetcher.state === "submitting";
-
-  // Check if there was a loader error
-  const hasError = 'error' in loaderData;
 
   // State for design values
   const [designValues, setDesignValues] = useState({
@@ -165,33 +226,6 @@ export default function PopupDesign() {
       }}
     >
       <Layout>
-        {migrationPending && (
-          <Layout.Section>
-            <Banner status="warning">
-              {message}
-              <br />
-              <Text variant="bodySm" as="p">
-                You can preview the design interface below, but saving changes requires database migration.
-              </Text>
-              <Text variant="bodySm" as="p">
-                <strong>Debug:</strong> <a href="/api/debug/db" target="_blank">Check database status</a>
-              </Text>
-            </Banner>
-          </Layout.Section>
-        )}
-
-        {hasError && (
-          <Layout.Section>
-            <Banner status="critical">
-              {loaderData.error}
-              <br />
-              <Text variant="bodySm" as="p">
-                Unable to load popup data. Please check database connectivity.
-              </Text>
-            </Banner>
-          </Layout.Section>
-        )}
-
         {actionData?.error && (
           <Layout.Section>
             <Banner status="critical">{actionData.error}</Banner>
@@ -397,7 +431,6 @@ export default function PopupDesign() {
                           variant="primary"
                           submit
                           loading={isLoading}
-                          disabled={migrationPending}
                         >
                           Save Design
                         </Button>
@@ -496,7 +529,6 @@ export default function PopupDesign() {
                           submit
                           fullWidth
                           loading={fetcher.state === "submitting"}
-                          disabled={migrationPending}
                         >
                           Apply Theme Colors
                         </Button>

@@ -268,7 +268,7 @@ export async function action({ request }: ActionFunctionArgs) {
     });
 
     // Return success response with script tag info
-    return redirect(`/app/popups?created=${popup.id}&scriptTag=${scriptTagId || ''}`);
+    return redirect(`/app/popups/${popup.id}/design?created=true`);
 
   } catch (error) {
     console.error("Popup creation error:", error);
