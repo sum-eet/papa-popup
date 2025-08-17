@@ -370,6 +370,16 @@ export default function EditPopup() {
         content: 'Back to popups',
         url: '/app/popups'
       }}
+      secondaryActions={[
+        {
+          content: 'Design & Theme',
+          url: `/app/popups/${popup.id}/design`,
+        },
+        {
+          content: 'Preview',
+          url: `/app/popups/${popup.id}/preview`,
+        }
+      ]}
     >
       <Layout>
         <Layout.Section>

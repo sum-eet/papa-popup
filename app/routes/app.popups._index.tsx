@@ -148,7 +148,7 @@ export default function PopupsList() {
       })()}
     </Text>,
     
-    <div key={`actions-${popup.id}`} style={{ display: 'flex', gap: '8px' }}>
+    <div key={`actions-${popup.id}`} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
       <Button
         size="micro"
         variant="secondary"
@@ -156,6 +156,15 @@ export default function PopupsList() {
         disabled={isLoading}
       >
         Edit
+      </Button>
+
+      <Button
+        size="micro"
+        variant="secondary"
+        url={`/app/popups/${popup.id}/design`}
+        disabled={isLoading}
+      >
+        Design
       </Button>
       
       <Button

@@ -20,6 +20,9 @@
     responses: {},
     popup: null
   };
+
+  // Track loaded CSS to avoid duplicates
+  let loadedPopupCSS = null;
   
   // Parse current page type from URL
   function getPageType() {
@@ -34,6 +37,53 @@
     if (path.includes('/blogs/')) return 'blog';
     
     return 'other';
+  }
+
+  // Load dynamic popup CSS
+  async function loadPopupCSS(popupId) {
+    // Skip if already loaded for this popup
+    if (loadedPopupCSS === popupId) {
+      console.log('🎨 Papa Popup: CSS already loaded for popup:', popupId);
+      return;
+    }
+
+    try {
+      console.log('🎨 Papa Popup: Loading dynamic CSS for popup:', popupId);
+      
+      // Remove existing dynamic styles
+      const existingStyles = document.getElementById('papa-popup-dynamic-styles');
+      if (existingStyles) {
+        existingStyles.remove();
+      }
+
+      // Create link element for dynamic CSS
+      const linkElement = document.createElement('link');
+      linkElement.id = 'papa-popup-dynamic-styles';
+      linkElement.rel = 'stylesheet';
+      linkElement.type = 'text/css';
+      linkElement.href = `${APP_URL}/api/popup-styles/${popupId}/css`;
+      
+      // Add to head
+      document.head.appendChild(linkElement);
+      
+      // Wait for CSS to load
+      await new Promise((resolve, reject) => {
+        linkElement.onload = resolve;
+        linkElement.onerror = () => {
+          console.warn('⚠️ Papa Popup: Failed to load dynamic CSS, using fallback');
+          resolve(); // Don't reject, just continue with fallback styles
+        };
+        // Timeout after 3 seconds
+        setTimeout(resolve, 3000);
+      });
+
+      loadedPopupCSS = popupId;
+      console.log('✅ Papa Popup: Dynamic CSS loaded successfully');
+      
+    } catch (error) {
+      console.warn('⚠️ Papa Popup: Error loading dynamic CSS:', error);
+      // Continue without dynamic styles - fallback styles will be used
+    }
   }
 
 
@@ -87,7 +137,7 @@
   }
 
   // Render multi-step popup
-  function renderMultiStepPopup() {
+  async function renderMultiStepPopup() {
     console.log('🎨 Papa Popup: Rendering multi-step popup...');
     
     const currentStepData = getCurrentStepData();
@@ -96,125 +146,19 @@
       return;
     }
 
+    // Load dynamic CSS for this popup
+    if (currentPopupState.popup && currentPopupState.popup.id) {
+      await loadPopupCSS(currentPopupState.popup.id);
+    }
+
     const popupHTML = `
-      <div id="papa-popup-overlay" style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 10000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        animation: fadeIn 0.3s ease-out;
-      ">
-        <div id="papa-popup-modal" style="
-          background: white;
-          padding: 40px;
-          border-radius: 12px;
-          max-width: 400px;
-          width: 90%;
-          text-align: center;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-          position: relative;
-          animation: slideIn 0.3s ease-out;
-        ">
-          <button id="papa-popup-close" style="
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: #666;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          " aria-label="Close">&times;</button>
-          
+      <div id="papa-popup-overlay">
+        <div id="papa-popup-modal">
+          <button id="papa-popup-close" aria-label="Close">&times;</button>
           ${renderProgressIndicator()}
           ${renderStepContent(currentStepData)}
         </div>
       </div>
-
-      <style>
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideIn {
-          from { transform: translateY(-50px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        .papa-popup-option {
-          padding: 12px 16px;
-          margin: 8px 0;
-          background: #f8f9fa;
-          border: 2px solid #e9ecef;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-        .papa-popup-option:hover {
-          background: #e9ecef;
-          border-color: #007cba;
-        }
-        .papa-popup-option.selected {
-          background: #007cba;
-          color: white;
-          border-color: #005a87;
-        }
-        .papa-popup-input {
-          padding: 12px;
-          border: 2px solid #ddd;
-          border-radius: 6px;
-          font-size: 16px;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          outline: none;
-          transition: border-color 0.2s;
-          width: 100%;
-          box-sizing: border-box;
-        }
-        .papa-popup-input:focus {
-          border-color: #007cba !important;
-        }
-        .papa-popup-button {
-          background: #007cba;
-          color: white;
-          padding: 12px 24px;
-          border: none;
-          border-radius: 6px;
-          font-size: 16px;
-          font-weight: 600;
-          cursor: pointer;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          transition: background-color 0.2s;
-          margin: 5px;
-        }
-        .papa-popup-button:hover {
-          background: #005a87 !important;
-        }
-        .papa-popup-button:disabled {
-          background: #ccc !important;
-          cursor: not-allowed;
-        }
-        .papa-popup-discount-code {
-          font-size: 24px;
-          font-weight: bold;
-          color: #007cba;
-          background: #f0f9ff;
-          padding: 16px;
-          border: 2px dashed #007cba;
-          border-radius: 8px;
-          margin: 20px 0;
-        }
-      </style>
     `;
 
     document.body.insertAdjacentHTML('beforeend', popupHTML);
@@ -240,39 +184,19 @@
     }
 
     return `
-      <div style="
-        margin-bottom: 20px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid #eee;
-      ">
-        <div style="
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: 8px;
-          margin-bottom: 10px;
-        ">
+      <div class="papa-popup-progress">
+        <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 10px;">
           ${Array.from({ length: currentPopupState.totalSteps }, (_, i) => {
             const stepNum = i + 1;
             const isActive = stepNum === currentPopupState.currentStep;
             const isCompleted = stepNum < currentPopupState.currentStep;
             
             return `
-              <div style="
-                width: 12px;
-                height: 12px;
-                border-radius: 50%;
-                background: ${isActive ? '#007cba' : isCompleted ? '#28a745' : '#ddd'};
-              "></div>
+              <div class="papa-popup-progress-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}"></div>
             `;
           }).join('')}
         </div>
-        <p style="
-          margin: 0;
-          font-size: 14px;
-          color: #666;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        ">Step ${currentPopupState.currentStep} of ${currentPopupState.totalSteps}</p>
+        <p class="papa-popup-text" style="margin: 0; font-size: 14px;">Step ${currentPopupState.currentStep} of ${currentPopupState.totalSteps}</p>
       </div>
     `;
   }
@@ -301,13 +225,7 @@
     
     return `
       <div id="papa-popup-step-content">
-        <h2 style="
-          margin: 0 0 20px 0;
-          font-size: 22px;
-          color: #333;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          line-height: 1.3;
-        ">${content.question || 'Question'}</h2>
+        <h2 class="papa-popup-heading">${content.question || 'Question'}</h2>
         
         <div id="papa-popup-options" style="margin-bottom: 20px;">
           ${options.map((option, index) => `
@@ -319,7 +237,7 @@
         
         <div style="display: flex; justify-content: space-between; margin-top: 20px;">
           ${currentPopupState.currentStep > 1 ? 
-            '<button class="papa-popup-button" id="papa-popup-back">Back</button>' : 
+            '<button class="papa-popup-button secondary" id="papa-popup-back">Back</button>' : 
             '<div></div>'
           }
           <button class="papa-popup-button" id="papa-popup-next" disabled>Next</button>
@@ -332,28 +250,16 @@
   function renderEmailStep(content) {
     return `
       <div id="papa-popup-step-content">
-        <h2 style="
-          margin: 0 0 15px 0;
-          font-size: 24px;
-          color: #333;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        ">${content.headline || 'Get 10% Off!'}</h2>
+        <h2 class="papa-popup-heading">${content.headline || 'Get 10% Off!'}</h2>
         
-        <p style="
-          margin: 0 0 25px 0;
-          color: #666;
-          font-size: 16px;
-          line-height: 1.5;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        ">${content.description || 'Subscribe to our newsletter'}</p>
+        <p class="papa-popup-text">${content.description || 'Subscribe to our newsletter'}</p>
         
         <form id="papa-popup-email-form" style="margin-bottom: 20px;">
           <input type="email" 
                  id="papa-popup-email" 
                  class="papa-popup-input"
                  placeholder="${content.placeholder || 'Enter your email'}" 
-                 required 
-                 style="margin-bottom: 15px;">
+                 required>
           <button type="submit" 
                   class="papa-popup-button" 
                   id="papa-popup-submit" 
@@ -363,7 +269,7 @@
         </form>
         
         ${currentPopupState.currentStep > 1 ? 
-          '<button class="papa-popup-button" id="papa-popup-back" style="width: 100%; background: #6c757d;">Back</button>' : 
+          '<button class="papa-popup-button secondary" id="papa-popup-back" style="width: 100%;">Back</button>' : 
           ''
         }
       </div>
@@ -374,21 +280,10 @@
   function renderDiscountStep(content) {
     return `
       <div id="papa-popup-step-content">
-        <h2 style="
-          margin: 0 0 20px 0;
-          font-size: 24px;
-          color: #333;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        ">${content.headline || "Here's your discount!"}</h2>
+        <h2 class="papa-popup-heading">${content.headline || "Here's your discount!"}</h2>
         
         ${content.description ? `
-          <p style="
-            margin: 0 0 20px 0;
-            color: #666;
-            font-size: 16px;
-            line-height: 1.5;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          ">${content.description}</p>
+          <p class="papa-popup-text">${content.description}</p>
         ` : ''}
         
         <div class="papa-popup-discount-code">
@@ -396,12 +291,7 @@
         </div>
         
         ${content.validityText ? `
-          <p style="
-            margin: 10px 0 20px 0;
-            color: #666;
-            font-size: 14px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          ">${content.validityText}</p>
+          <p class="papa-popup-text" style="font-size: 14px;">${content.validityText}</p>
         ` : ''}
         
         <button class="papa-popup-button" id="papa-popup-close-final" style="width: 100%;">
@@ -415,26 +305,15 @@
   function renderContentStep(content) {
     return `
       <div id="papa-popup-step-content">
-        <h2 style="
-          margin: 0 0 20px 0;
-          font-size: 24px;
-          color: #333;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        ">${content.headline || 'Welcome!'}</h2>
+        <h2 class="papa-popup-heading">${content.headline || 'Welcome!'}</h2>
         
         ${content.description ? `
-          <p style="
-            margin: 0 0 25px 0;
-            color: #666;
-            font-size: 16px;
-            line-height: 1.5;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          ">${content.description}</p>
+          <p class="papa-popup-text">${content.description}</p>
         ` : ''}
         
         <div style="display: flex; justify-content: space-between; margin-top: 20px;">
           ${currentPopupState.currentStep > 1 ? 
-            '<button class="papa-popup-button" id="papa-popup-back">Back</button>' : 
+            '<button class="papa-popup-button secondary" id="papa-popup-back">Back</button>' : 
             '<div></div>'
           }
           <button class="papa-popup-button" id="papa-popup-next">Continue</button>
@@ -706,115 +585,37 @@
   }
 
   // Render legacy popup (backward compatibility)
-  function renderLegacyPopup(config) {
+  async function renderLegacyPopup(config) {
     console.log('🎨 Papa Popup: Rendering legacy popup...');
     
+    // Load dynamic CSS if popupId is available
+    if (config.popupId) {
+      await loadPopupCSS(config.popupId);
+    }
+    
     const popupHTML = `
-      <div id="papa-popup-overlay" style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 10000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        animation: fadeIn 0.3s ease-out;
-      ">
-        <div id="papa-popup-modal" style="
-          background: white;
-          padding: 40px;
-          border-radius: 12px;
-          max-width: 400px;
-          width: 90%;
-          text-align: center;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-          position: relative;
-          animation: slideIn 0.3s ease-out;
-        ">
-          <button id="papa-popup-close" style="
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: #666;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          " aria-label="Close">&times;</button>
+      <div id="papa-popup-overlay">
+        <div id="papa-popup-modal">
+          <button id="papa-popup-close" aria-label="Close">&times;</button>
           
-          <h2 style="
-            margin: 0 0 15px 0;
-            font-size: 24px;
-            color: #333;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          ">${config.headline}</h2>
+          <h2 class="papa-popup-heading">${config.headline}</h2>
           
-          <p style="
-            margin: 0 0 25px 0;
-            color: #666;
-            font-size: 16px;
-            line-height: 1.5;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          ">${config.description}</p>
+          <p class="papa-popup-text">${config.description}</p>
           
-          <form id="papa-popup-form" style="
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-          ">
-            <input type="email" id="papa-popup-email" placeholder="Enter your email" required style="
-              padding: 12px;
-              border: 2px solid #ddd;
-              border-radius: 6px;
-              font-size: 16px;
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              outline: none;
-              transition: border-color 0.2s;
-            ">
-            <button type="submit" id="papa-popup-submit" style="
-              background: #007cba;
-              color: white;
-              padding: 12px;
-              border: none;
-              border-radius: 6px;
-              font-size: 16px;
-              font-weight: 600;
-              cursor: pointer;
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              transition: background-color 0.2s;
-            ">${config.buttonText}</button>
+          <form id="papa-popup-form" style="display: flex; flex-direction: column; gap: 15px;">
+            <input type="email" 
+                   id="papa-popup-email" 
+                   class="papa-popup-input"
+                   placeholder="Enter your email" 
+                   required>
+            <button type="submit" 
+                    id="papa-popup-submit" 
+                    class="papa-popup-button">
+              ${config.buttonText}
+            </button>
           </form>
         </div>
       </div>
-
-      <style>
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideIn {
-          from { transform: translateY(-50px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        #papa-popup-email:focus {
-          border-color: #007cba !important;
-        }
-        #papa-popup-submit:hover {
-          background: #005a87 !important;
-        }
-        #papa-popup-close:hover {
-          background: rgba(0, 0, 0, 0.1) !important;
-          border-radius: 4px;
-        }
-      </style>
     `;
 
     document.body.insertAdjacentHTML('beforeend', popupHTML);
@@ -930,19 +731,11 @@
             color: white;
             font-size: 24px;
           ">✓</div>
-          <h2 style="
-            color: #28a745;
-            margin: 0 0 15px 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          ">Thank you!</h2>
-          <p style="
-            color: #666;
-            margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          ">Successfully subscribed to our newsletter.</p>
+          <h2 class="papa-popup-heading" style="color: #28a745;">Thank you!</h2>
+          <p class="papa-popup-text">Successfully subscribed to our newsletter.</p>
           ${currentPopupState.discountCode ? `
             <div style="margin-top: 20px;">
-              <p style="color: #666; margin: 10px 0; font-size: 14px;">Here's your discount code:</p>
+              <p class="papa-popup-text" style="font-size: 14px;">Here's your discount code:</p>
               <div class="papa-popup-discount-code">${currentPopupState.discountCode}</div>
             </div>
           ` : ''}
@@ -1066,7 +859,7 @@
     if (config.popupType && config.popupType !== 'SIMPLE_EMAIL') {
       await initializeMultiStepPopup(config);
     } else {
-      renderLegacyPopup(config);
+      await renderLegacyPopup(config);
     }
   }
 
