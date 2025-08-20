@@ -22,13 +22,18 @@ import prisma from "../db.server";
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
   
+  console.log('👥 Analytics Customers: Starting loader for shop:', session.shop);
+  
   const shop = await prisma.shop.findUnique({
     where: { domain: session.shop }
   });
 
   if (!shop) {
+    console.error('❌ Analytics Customers: Shop not found for domain:', session.shop);
     throw new Error("Shop not found");
   }
+
+  console.log('✅ Analytics Customers: Shop found, fetching customer analytics data...');
 
   // Calculate time periods
   const now = new Date();
@@ -37,14 +42,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   // Get customer analytics data
-  const [
-    totalCustomers,
-    customersThisWeek,
-    customersThisMonth,
-    syncStatus,
-    recentCustomers,
-    topCustomerJourneys
-  ] = await Promise.all([
+  let analytics;
+  try {
+    analytics = await Promise.all([
     // Total unique customers
     prisma.customerAnalytics.count({
       where: { shopId: shop.id }
@@ -103,7 +103,24 @@ export async function loader({ request }: LoaderFunctionArgs) {
       orderBy: { totalInteractions: 'desc' },
       take: 5
     })
-  ]);
+    ]);
+
+    console.log('✅ Analytics Customers: All database queries completed successfully');
+  } catch (error) {
+    console.error('❌ Analytics Customers: Database query failed:', error);
+    // Return fallback data to prevent complete failure
+    analytics = [0, 0, 0, [], [], []];
+  }
+
+  // Extract results from analytics array
+  const [
+    totalCustomers,
+    customersThisWeek,
+    customersThisMonth,
+    syncStatus,
+    recentCustomers,
+    topCustomerJourneys
+  ] = analytics;
 
   // Process sync status
   const syncSummary = {

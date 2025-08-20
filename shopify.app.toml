@@ -3,7 +3,7 @@
 client_id = "5bcf826801b7097d7f0f87ea479e66f3"
 name = "papa-popup"
 handle = "papa-popup"
-application_url = "https://packard-airline-flyer-minimal.trycloudflare.com"
+application_url = "https://components-athletics-fabric-taiwan.trycloudflare.com"
 embedded = true
 
 [build]
@@ -38,7 +38,7 @@ uri = "/webhooks/app/scopes_update"
 scopes = "write_products,write_script_tags,read_script_tags,read_themes"
 
 [auth]
-redirect_urls = ["https://packard-airline-flyer-minimal.trycloudflare.com/auth/callback", "https://packard-airline-flyer-minimal.trycloudflare.com/auth/shopify/callback", "https://packard-airline-flyer-minimal.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://components-athletics-fabric-taiwan.trycloudflare.com/auth/callback", "https://components-athletics-fabric-taiwan.trycloudflare.com/auth/shopify/callback", "https://components-athletics-fabric-taiwan.trycloudflare.com/api/auth/callback"]
 include_config_on_deploy = true
 [pos]
 embedded = false

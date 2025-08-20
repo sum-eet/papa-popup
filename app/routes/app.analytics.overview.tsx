@@ -24,6 +24,8 @@ import prisma from "../db.server";
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
   
+  console.log('📊 Analytics Overview: Starting loader for shop:', session.shop);
+  
   const shop = await prisma.shop.findUnique({
     where: { domain: session.shop },
     include: {
@@ -42,8 +44,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   });
 
   if (!shop) {
+    console.error('❌ Analytics Overview: Shop not found for domain:', session.shop);
     throw new Error("Shop not found");
   }
+
+  console.log('✅ Analytics Overview: Shop found with', shop.popups?.length || 0, 'popups');
 
   // Calculate time periods
   const now = new Date();

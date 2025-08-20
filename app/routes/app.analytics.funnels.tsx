@@ -22,6 +22,8 @@ import prisma from "../db.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
+  
+  console.log('🔄 Analytics Funnels: Starting loader for shop:', session.shop);
   const url = new URL(request.url);
   const popupId = url.searchParams.get('popupId');
   const timeframe = url.searchParams.get('timeframe') || '7d';
@@ -37,8 +39,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   });
 
   if (!shop) {
+    console.error('❌ Analytics Funnels: Shop not found for domain:', session.shop);
     throw new Error("Shop not found");
   }
+
+  console.log('✅ Analytics Funnels: Shop found with', shop.popups?.length || 0, 'popups');
 
   // Calculate date range
   let dateFilter: any = {};
@@ -57,15 +62,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   };
 
   // Get funnel analytics data
-  const [
-    totalImpressions,
-    totalInteractions,
-    totalCompletions,
-    totalDropoffs,
-    funnelSteps,
-    popupFunnels,
-    selectedPopup
-  ] = await Promise.all([
+  let analytics;
+  try {
+    analytics = await Promise.all([
     // Total funnel impressions
     prisma.popupAnalytics.count({
       where: { ...baseFilter, eventType: 'impression' }
@@ -99,7 +98,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       FROM "PopupAnalytics" pa
       WHERE pa."popupId" = ${popupId}
         AND pa."shopId" = ${shop.id}
-        ${dateFilter.createdAt ? `AND pa."createdAt" >= ${dateFilter.createdAt.gte}` : ''}
+        ${dateFilter.createdAt ? `AND pa."createdAt" >= '${dateFilter.createdAt.gte.toISOString()}'` : ''}
       GROUP BY pa."stepNumber"
       ORDER BY pa."stepNumber"
     ` : [],
@@ -121,7 +120,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         FROM "PopupAnalytics" 
         WHERE "shopId" = ${shop.id} 
           AND "eventType" = 'impression'
-          ${dateFilter.createdAt ? `AND "createdAt" >= ${dateFilter.createdAt.gte}` : ''}
+          ${dateFilter.createdAt ? `AND "createdAt" >= '${dateFilter.createdAt.gte.toISOString()}'` : ''}
         GROUP BY "popupId"
       ) impressions ON p.id = impressions."popupId"
       LEFT JOIN (
@@ -129,7 +128,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         FROM "PopupAnalytics" 
         WHERE "shopId" = ${shop.id} 
           AND "eventType" IN ('click', 'button_click', 'step_view')
-          ${dateFilter.createdAt ? `AND "createdAt" >= ${dateFilter.createdAt.gte}` : ''}
+          ${dateFilter.createdAt ? `AND "createdAt" >= '${dateFilter.createdAt.gte.toISOString()}'` : ''}
         GROUP BY "popupId"
       ) interactions ON p.id = interactions."popupId"
       LEFT JOIN (
@@ -137,7 +136,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         FROM "PopupAnalytics" 
         WHERE "shopId" = ${shop.id} 
           AND "eventType" = 'complete'
-          ${dateFilter.createdAt ? `AND "createdAt" >= ${dateFilter.createdAt.gte}` : ''}
+          ${dateFilter.createdAt ? `AND "createdAt" >= '${dateFilter.createdAt.gte.toISOString()}'` : ''}
         GROUP BY "popupId"
       ) completions ON p.id = completions."popupId"
       LEFT JOIN (
@@ -145,7 +144,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         FROM "PopupAnalytics" 
         WHERE "shopId" = ${shop.id} 
           AND "eventType" = 'close'
-          ${dateFilter.createdAt ? `AND "createdAt" >= ${dateFilter.createdAt.gte}` : ''}
+          ${dateFilter.createdAt ? `AND "createdAt" >= '${dateFilter.createdAt.gte.toISOString()}'` : ''}
         GROUP BY "popupId"
       ) dropoffs ON p.id = dropoffs."popupId"
       WHERE p."shopId" = ${shop.id} AND p."isDeleted" = false
@@ -161,7 +160,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
         }
       }
     }) : null
-  ]);
+    ]);
+
+    console.log('✅ Analytics Funnels: All database queries completed successfully');
+  } catch (error) {
+    console.error('❌ Analytics Funnels: Database query failed:', error);
+    // Return fallback data to prevent complete failure
+    analytics = [0, 0, 0, 0, [], [], null];
+  }
+
+  // Extract results from analytics array
+  const [
+    totalImpressions,
+    totalInteractions,
+    totalCompletions,
+    totalDropoffs,
+    funnelSteps,
+    popupFunnels,
+    selectedPopup
+  ] = analytics;
 
   // Calculate funnel metrics
   const engagementRate = totalImpressions > 0 ? (totalInteractions / totalImpressions) * 100 : 0;

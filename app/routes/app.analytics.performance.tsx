@@ -23,6 +23,8 @@ import prisma from "../db.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
+  
+  console.log('📈 Analytics Performance: Starting loader for shop:', session.shop);
   const url = new URL(request.url);
   const popupId = url.searchParams.get('popupId');
   const timeframe = url.searchParams.get('timeframe') || '7d';
@@ -38,8 +40,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   });
 
   if (!shop) {
+    console.error('❌ Analytics Performance: Shop not found for domain:', session.shop);
     throw new Error("Shop not found");
   }
+
+  console.log('✅ Analytics Performance: Shop found with', shop.popups?.length || 0, 'popups');
 
   // Calculate date range
   let dateFilter: any = {};
@@ -58,16 +63,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   };
 
   // Get comprehensive analytics
-  const [
-    impressions,
-    clicks,
-    closes,
-    completions,
-    emailsCollected,
-    stepAnalytics,
-    popupPerformance,
-    selectedPopup
-  ] = await Promise.all([
+  let analytics;
+  try {
+    analytics = await Promise.all([
     // Total impressions
     prisma.popupAnalytics.count({
       where: { ...baseFilter, eventType: 'impression' }
@@ -113,7 +111,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         FROM "PopupAnalytics" 
         WHERE "popupId" = ${popupId} 
           AND "eventType" = 'step_view'
-          ${dateFilter.createdAt ? `AND "createdAt" >= ${dateFilter.createdAt.gte}` : ''}
+          ${dateFilter.createdAt ? `AND "createdAt" >= '${dateFilter.createdAt.gte.toISOString()}'` : ''}
         GROUP BY "stepNumber"
       ) views ON p."stepNumber" = views."stepNumber"
       LEFT JOIN (
@@ -121,7 +119,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         FROM "PopupAnalytics" 
         WHERE "popupId" = ${popupId} 
           AND "eventType" = 'step_complete'
-          ${dateFilter.createdAt ? `AND "createdAt" >= ${dateFilter.createdAt.gte}` : ''}
+          ${dateFilter.createdAt ? `AND "createdAt" >= '${dateFilter.createdAt.gte.toISOString()}'` : ''}
         GROUP BY "stepNumber"
       ) completions ON p."stepNumber" = completions."stepNumber"
       WHERE p."popupId" = ${popupId}
@@ -144,7 +142,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         FROM "PopupAnalytics" 
         WHERE "shopId" = ${shop.id} 
           AND "eventType" = 'impression'
-          ${dateFilter.createdAt ? `AND "createdAt" >= ${dateFilter.createdAt.gte}` : ''}
+          ${dateFilter.createdAt ? `AND "createdAt" >= '${dateFilter.createdAt.gte.toISOString()}'` : ''}
         GROUP BY "popupId"
       ) impressions ON p.id = impressions."popupId"
       LEFT JOIN (
@@ -152,14 +150,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
         FROM "PopupAnalytics" 
         WHERE "shopId" = ${shop.id} 
           AND "eventType" = 'complete'
-          ${dateFilter.createdAt ? `AND "createdAt" >= ${dateFilter.createdAt.gte}` : ''}
+          ${dateFilter.createdAt ? `AND "createdAt" >= '${dateFilter.createdAt.gte.toISOString()}'` : ''}
         GROUP BY "popupId"
       ) completions ON p.id = completions."popupId"
       LEFT JOIN (
         SELECT "popupId", COUNT(*) as count
         FROM "CollectedEmail" 
         WHERE "shopId" = ${shop.id}
-          ${dateFilter.createdAt ? `AND "createdAt" >= ${dateFilter.createdAt.gte}` : ''}
+          ${dateFilter.createdAt ? `AND "createdAt" >= '${dateFilter.createdAt.gte.toISOString()}'` : ''}
         GROUP BY "popupId"
       ) emails ON p.id = emails."popupId"
       WHERE p."shopId" = ${shop.id} AND p."isDeleted" = false
@@ -175,7 +173,26 @@ export async function loader({ request }: LoaderFunctionArgs) {
         }
       }
     }) : null
-  ]);
+    ]);
+
+    console.log('✅ Analytics Performance: All database queries completed successfully');
+  } catch (error) {
+    console.error('❌ Analytics Performance: Database query failed:', error);
+    // Return fallback data to prevent complete failure
+    analytics = [0, 0, 0, 0, 0, [], [], null];
+  }
+
+  // Extract results from analytics array
+  const [
+    impressions,
+    clicks,
+    closes,
+    completions,
+    emailsCollected,
+    stepAnalytics,
+    popupPerformance,
+    selectedPopup
+  ] = analytics;
 
   // Calculate performance metrics
   const clickRate = impressions > 0 ? (clicks / impressions) * 100 : 0;
