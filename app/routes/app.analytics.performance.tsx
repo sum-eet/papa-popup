@@ -1,5 +1,4 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
 import { useLoaderData, useSearchParams } from "@remix-run/react";
 import {
   Page,
@@ -39,72 +38,49 @@ export async function loader({ request }: LoaderFunctionArgs) {
     throw new Error("Shop not found");
   }
 
-  try {
-
-    // Simple performance data
-    const selectedPopup = popupId ? await prisma.popup.findUnique({
-      where: { id: popupId },
-      include: {
-        steps: {
-          orderBy: { stepNumber: 'asc' }
-        }
+  // Simple performance data
+  const selectedPopup = popupId ? await prisma.popup.findUnique({
+    where: { id: popupId },
+    include: {
+      steps: {
+        orderBy: { stepNumber: 'asc' }
       }
-    }) : null;
+    }
+  }) : null;
 
-    // Basic popup data for comparison table
-    const popups = await prisma.popup.findMany({
-      where: { shopId: shop.id, isDeleted: false },
-      orderBy: { createdAt: 'desc' }
-    });
+  // Basic popup data for comparison table
+  const popups = await prisma.popup.findMany({
+    where: { shopId: shop.id, isDeleted: false },
+    orderBy: { createdAt: 'desc' }
+  });
 
-    return json({
-      shop,
-      selectedPopup,
-      timeframe,
-      metrics: {
-        impressions: 0,
-        clicks: 0,
-        closes: 0,
-        completions: 0,
-        emailsCollected: 0,
-        clickRate: 0,
-        closeRate: 0,
-        conversionRate: 0,
-        completionRate: 0
-      },
-      stepAnalytics: [],
-      popupPerformance: popups.map((popup: any) => ({
-        id: popup.id,
-        name: popup.name,
-        popupType: popup.popupType,
-        status: popup.status,
-        impressions: 0,
-        interactions: 0,
-        completions: 0,
-        emails: 0
-      }))
-    });
-  } catch (error) {
-    console.error('Analytics performance error:', error);
-    return json({
-      shop: null,
-      selectedPopup: null,
-      timeframe: '7d',
-      metrics: {
-        impressions: 0,
-        clicks: 0,
-        closes: 0,
-        completions: 0,
-        emailsCollected: 0,
-        clickRate: 0,
-        closeRate: 0,
-        conversionRate: 0,
-        completionRate: 0
-      },
-      stepAnalytics: [],
-      popupPerformance: []
-    });
-  }
+  return {
+    shop,
+    selectedPopup,
+    timeframe,
+    metrics: {
+      impressions: 0,
+      clicks: 0,
+      closes: 0,
+      completions: 0,
+      emailsCollected: 0,
+      clickRate: 0,
+      closeRate: 0,
+      conversionRate: 0,
+      completionRate: 0
+    },
+    stepAnalytics: [],
+    popupPerformance: popups.map((popup: any) => ({
+      id: popup.id,
+      name: popup.name,
+      popupType: popup.popupType,
+      status: popup.status,
+      impressions: 0,
+      interactions: 0,
+      completions: 0,
+      emails: 0
+    }))
+  };
 }
 
 export default function AnalyticsPerformance() {

@@ -1,5 +1,4 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import {
   Page,
@@ -29,58 +28,37 @@ export async function loader({ request }: LoaderFunctionArgs) {
     throw new Error("Shop not found");
   }
 
-  try {
+  // Simple customer counts
+  const totalCustomers = await prisma.collectedEmail.count({
+    where: { shopId: shop.id }
+  });
 
-    // Simple customer counts
-    const totalCustomers = await prisma.collectedEmail.count({
-      where: { shopId: shop.id }
-    });
+  const customersThisWeek = 0; // Placeholder
+  const customersThisMonth = 0; // Placeholder
 
-    const customersThisWeek = 0; // Placeholder
-    const customersThisMonth = 0; // Placeholder
+  // Recent customers
+  const recentCustomers = await prisma.collectedEmail.findMany({
+    where: { shopId: shop.id },
+    orderBy: { createdAt: 'desc' },
+    take: 10
+  });
 
-    // Recent customers
-    const recentCustomers = await prisma.collectedEmail.findMany({
-      where: { shopId: shop.id },
-      orderBy: { createdAt: 'desc' },
-      take: 10
-    });
-
-    return json({
-      shop,
-      stats: {
-        totalCustomers,
-        customersThisWeek,
-        customersThisMonth,
-        syncRate: 0
-      },
-      syncSummary: {
-        pending: 0,
-        synced: totalCustomers,
-        failed: 0
-      },
-      recentCustomers,
-      topCustomerJourneys: []
-    });
-  } catch (error) {
-    console.error('Analytics customers error:', error);
-    return json({
-      shop: null,
-      stats: {
-        totalCustomers: 0,
-        customersThisWeek: 0,
-        customersThisMonth: 0,
-        syncRate: 0
-      },
-      syncSummary: {
-        pending: 0,
-        synced: 0,
-        failed: 0
-      },
-      recentCustomers: [],
-      topCustomerJourneys: []
-    });
-  }
+  return {
+    shop,
+    stats: {
+      totalCustomers,
+      customersThisWeek,
+      customersThisMonth,
+      syncRate: 0
+    },
+    syncSummary: {
+      pending: 0,
+      synced: totalCustomers,
+      failed: 0
+    },
+    recentCustomers,
+    topCustomerJourneys: []
+  };
 }
 
 export default function AnalyticsCustomers() {

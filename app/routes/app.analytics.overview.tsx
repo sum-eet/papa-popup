@@ -1,5 +1,4 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import {
   Page,
@@ -28,65 +27,43 @@ export async function loader({ request }: LoaderFunctionArgs) {
     throw new Error("Shop not found");
   }
 
-  try {
+  // Simple counts - no complex queries
+  const totalEmails = await prisma.collectedEmail.count({
+    where: { shopId: shop.id }
+  });
 
-    // Simple counts - no complex queries
-    const totalEmails = await prisma.collectedEmail.count({
-      where: { shopId: shop.id }
-    });
+  const totalPopups = await prisma.popup.count({
+    where: { shopId: shop.id, isDeleted: false }
+  });
 
-    const totalPopups = await prisma.popup.count({
-      where: { shopId: shop.id, isDeleted: false }
-    });
+  const activePopups = await prisma.popup.count({
+    where: { shopId: shop.id, isDeleted: false, status: 'ACTIVE' }
+  });
 
-    const activePopups = await prisma.popup.count({
-      where: { shopId: shop.id, isDeleted: false, status: 'ACTIVE' }
-    });
+  // Get some basic popup data
+  const popups = await prisma.popup.findMany({
+    where: { shopId: shop.id, isDeleted: false },
+    orderBy: { createdAt: 'desc' },
+    take: 5
+  });
 
-    // Get some basic popup data
-    const popups = await prisma.popup.findMany({
-      where: { shopId: shop.id, isDeleted: false },
-      orderBy: { createdAt: 'desc' },
-      take: 5
-    });
-
-    return json({
-      shop,
-      stats: {
-        totalImpressions: 0,
-        impressionsToday: 0,
-        impressionsYesterday: 0,
-        impressionsTrend: 0,
-        totalEmails,
-        emailsToday: 0,
-        emailsThisWeek: 0,
-        conversionRate: 0,
-        activePopups,
-        totalPopups
-      },
-      topPerformingPopups: popups,
-      recentEvents: []
-    });
-  } catch (error) {
-    console.error('Analytics overview error:', error);
-    return json({
-      shop: null,
-      stats: {
-        totalImpressions: 0,
-        impressionsToday: 0,
-        impressionsYesterday: 0,
-        impressionsTrend: 0,
-        totalEmails: 0,
-        emailsToday: 0,
-        emailsThisWeek: 0,
-        conversionRate: 0,
-        activePopups: 0,
-        totalPopups: 0
-      },
-      topPerformingPopups: [],
-      recentEvents: []
-    });
-  }
+  return {
+    shop,
+    stats: {
+      totalImpressions: 0,
+      impressionsToday: 0,
+      impressionsYesterday: 0,
+      impressionsTrend: 0,
+      totalEmails,
+      emailsToday: 0,
+      emailsThisWeek: 0,
+      conversionRate: 0,
+      activePopups,
+      totalPopups
+    },
+    topPerformingPopups: popups,
+    recentEvents: []
+  };
 }
 
 export default function AnalyticsOverview() {
