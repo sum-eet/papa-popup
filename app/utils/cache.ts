@@ -44,8 +44,3 @@ class SimpleCache {
 }
 
 export const analyticsCache = new SimpleCache();
-
-// Cleanup every 10 minutes
-setInterval(() => {
-  analyticsCache.cleanup();
-}, 600000);
