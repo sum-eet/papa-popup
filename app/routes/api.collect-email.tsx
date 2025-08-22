@@ -2,6 +2,11 @@ import { type ActionFunctionArgs } from "@remix-run/node";
 import prisma from "../db.server";
 import { isMultiPopupEnabled } from "../utils/features";
 
+// Simple rate limiting - store IP requests in memory
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const RATE_LIMIT_MAX = 10; // 10 requests per minute per IP
+
 // This endpoint will be hit by the popup
 export async function action({ request }: ActionFunctionArgs) {
   // Enable CORS for storefront
@@ -17,6 +22,34 @@ export async function action({ request }: ActionFunctionArgs) {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  // Basic rate limiting by IP
+  const clientIP = request.headers.get('x-forwarded-for') || 
+                   request.headers.get('x-real-ip') || 
+                   'unknown';
+  
+  const now = Date.now();
+  const ipData = rateLimitMap.get(clientIP);
+  
+  if (ipData) {
+    if (now < ipData.resetTime) {
+      if (ipData.count >= RATE_LIMIT_MAX) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: "Too many requests. Please try again later." 
+          }),
+          { status: 429, headers: corsHeaders }
+        );
+      }
+      ipData.count++;
+    } else {
+      // Reset the count after window expires
+      rateLimitMap.set(clientIP, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    }
+  } else {
+    rateLimitMap.set(clientIP, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+  }
+
   try {
     const data = await request.json();
     const { 
@@ -28,11 +61,46 @@ export async function action({ request }: ActionFunctionArgs) {
       source = "popup" 
     } = data;
 
+    // Enhanced validation
     if (!email || !shopDomain) {
       return new Response(
         JSON.stringify({ 
           success: false, 
           error: "Email and shop domain are required" 
+        }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Invalid email format" 
+        }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+    
+    // Validate email length
+    if (email.length > 320) { // RFC 5321 limit
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Email address too long" 
+        }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+    
+    // Validate shop domain format
+    if (!/^[\w.-]+$/.test(shopDomain)) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Invalid shop domain format" 
         }),
         { status: 400, headers: corsHeaders }
       );

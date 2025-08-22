@@ -53,13 +53,42 @@ export async function action({ request }: ActionFunctionArgs) {
       throw new Error("Shop not found");
     }
 
-    // Extract form data
+    // Extract and validate form data
     const name = formData.get("name") as string;
     const popupType = formData.get("popupType") as PopupType;
     const targetPages = formData.getAll("targetPages") as string[];
     const specificUrls = formData.get("specificUrls") as string || "";
     const totalSteps = parseInt(formData.get("totalSteps") as string) || 1;
     const createAsActive = formData.get("createAsActive") === "true";
+    
+    // Basic validation
+    if (!name || name.trim().length === 0) {
+      return {
+        success: false,
+        error: "Popup name is required"
+      };
+    }
+    
+    if (name.trim().length > 100) {
+      return {
+        success: false,
+        error: "Popup name must be less than 100 characters"
+      };
+    }
+    
+    if (!popupType || !['SIMPLE_EMAIL', 'QUIZ_EMAIL', 'QUIZ_DISCOUNT', 'DIRECT_DISCOUNT'].includes(popupType)) {
+      return {
+        success: false,
+        error: "Invalid popup type selected"
+      };
+    }
+    
+    if (totalSteps < 1 || totalSteps > 10) {
+      return {
+        success: false,
+        error: "Total steps must be between 1 and 10"
+      };
+    }
     
     // Extract trigger configuration (URL removed)
     const triggerType = formData.get("triggerType") as string || "delay";

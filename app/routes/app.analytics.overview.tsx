@@ -20,11 +20,20 @@ import {
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { analyticsCache } from "../utils/cache";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
   
   console.log('📊 Analytics Overview: Starting loader for shop:', session.shop);
+  
+  // Check cache first
+  const cacheKey = `analytics-overview-${session.shop}`;
+  const cachedData = analyticsCache.get(cacheKey);
+  if (cachedData) {
+    console.log('✅ Analytics Overview: Using cached data');
+    return json(cachedData);
+  }
   
   const shop = await prisma.shop.findUnique({
     where: { domain: session.shop },
@@ -156,7 +165,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const impressionsTrend = impressionsYesterday > 0 ? 
     ((impressionsToday - impressionsYesterday) / impressionsYesterday) * 100 : 0;
 
-  return json({
+  const responseData = {
     shop,
     stats: {
       totalImpressions,
@@ -172,7 +181,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
     },
     topPerformingPopups,
     recentEvents
-  });
+  };
+
+  // Cache the response for 5 minutes
+  analyticsCache.set(cacheKey, responseData, 300000);
+  console.log('✅ Analytics Overview: Data cached for 5 minutes');
+
+  return json(responseData);
 }
 
 export default function AnalyticsOverview() {
@@ -356,12 +371,14 @@ export default function AnalyticsOverview() {
               <Text variant="headingMd" as="h2">Recent Events</Text>
             </div>
             {recentEvents.length > 0 ? (
-              <DataTable
-                columnContentTypes={['text', 'text', 'text', 'text']}
-                headings={['Event Type', 'Popup', 'Step', 'Time']}
-                rows={eventsTableRows}
-                hasZebraStriping
-              />
+              <div style={{ overflowX: 'auto' }}>
+                <DataTable
+                  columnContentTypes={['text', 'text', 'text', 'text']}
+                  headings={['Event Type', 'Popup', 'Step', 'Time']}
+                  rows={eventsTableRows}
+                  hasZebraStriping
+                />
+              </div>
             ) : (
               <div style={{ padding: '20px' }}>
                 <EmptyState

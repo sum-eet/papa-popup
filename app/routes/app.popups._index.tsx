@@ -246,12 +246,14 @@ export default function PopupsList() {
         <Layout.Section>
           <Card>
             {popups.length > 0 ? (
-              <DataTable
-                columnContentTypes={['text', 'text', 'text', 'text', 'text']}
-                headings={['Popup Name', 'Status', 'Type', 'Target Pages', 'Actions']}
-                rows={tableRows}
-                hasZebraStriping
-              />
+              <div style={{ overflowX: 'auto' }}>
+                <DataTable
+                  columnContentTypes={['text', 'text', 'text', 'text', 'text']}
+                  headings={['Popup Name', 'Status', 'Type', 'Target Pages', 'Actions']}
+                  rows={tableRows}
+                  hasZebraStriping
+                />
+              </div>
             ) : (
               <EmptyState
                 heading="No popups created yet"

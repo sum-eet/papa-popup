@@ -354,11 +354,13 @@ export default function AnalyticsCustomers() {
               <Text variant="headingMd" as="h2">Recent Customer Activity</Text>
             </div>
             {recentCustomers.length > 0 ? (
-              <DataTable
-                columnContentTypes={['text', 'text', 'numeric', 'text', 'text', 'text']}
-                headings={['Email', 'Source Popup', 'Interactions', 'Time Spent', 'Status', 'Date']}
-                rows={customersTableRows}
-              />
+              <div style={{ overflowX: 'auto' }}>
+                <DataTable
+                  columnContentTypes={['text', 'text', 'numeric', 'text', 'text', 'text']}
+                  headings={['Email', 'Source Popup', 'Interactions', 'Time Spent', 'Status', 'Date']}
+                  rows={customersTableRows}
+                />
+              </div>
             ) : (
               <div style={{ padding: '20px' }}>
                 <EmptyState

@@ -445,11 +445,13 @@ export default function AnalyticsFunnels() {
               </Text>
             </div>
             {popupFunnels.length > 0 ? (
-              <DataTable
-                columnContentTypes={['text', 'text', 'numeric', 'numeric', 'numeric', 'numeric', 'numeric', 'text']}
-                headings={['Popup Name', 'Status', 'Impressions', 'Interactions', 'Completions', 'Engagement %', 'Completion %', 'Actions']}
-                rows={funnelTableRows}
-              />
+              <div style={{ overflowX: 'auto' }}>
+                <DataTable
+                  columnContentTypes={['text', 'text', 'numeric', 'numeric', 'numeric', 'numeric', 'numeric', 'text']}
+                  headings={['Popup Name', 'Status', 'Impressions', 'Interactions', 'Completions', 'Engagement %', 'Completion %', 'Actions']}
+                  rows={funnelTableRows}
+                />
+              </div>
             ) : (
               <div style={{ padding: '20px' }}>
                 <EmptyState

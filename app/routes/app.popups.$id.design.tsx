@@ -366,10 +366,7 @@ export default function PopupDesign() {
 
         {actionData?.success && (
           <Layout.Section>
-            <Banner tone="success" action={{
-              content: 'Dismiss',
-              onAction: () => window.location.reload()
-            }}>
+            <Banner tone="success">
               {actionData.message} Your popup design has been updated and is now live!
             </Banner>
           </Layout.Section>
