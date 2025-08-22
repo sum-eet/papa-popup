@@ -1,5 +1,6 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
+import { useLoaderData, useRouteError } from "@remix-run/react";
+import { boundary } from "@shopify/shopify-app-remix/server";
 import {
   Page,
   Layout,
@@ -251,3 +252,12 @@ export default function AnalyticsOverview() {
     </Page>
   );
 }
+
+// Shopify needs Remix to catch some thrown responses, so that their headers are included in the response.
+export function ErrorBoundary() {
+  return boundary.error(useRouteError());
+}
+
+export const headers: HeadersFunction = (headersArgs) => {
+  return boundary.headers(headersArgs);
+};
