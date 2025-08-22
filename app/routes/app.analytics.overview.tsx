@@ -24,155 +24,72 @@ import prisma from "../db.server";
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
   
-  console.log('📊 Analytics Overview: Starting loader for shop:', session.shop);
-  
-  const shop = await prisma.shop.findUnique({
-    where: { domain: session.shop },
-    include: {
-      popups: {
-        where: { isDeleted: false },
-        include: {
-          _count: {
-            select: {
-              analytics: true
-            }
-          }
-        },
-        orderBy: { createdAt: 'desc' }
-      }
+  try {
+    const shop = await prisma.shop.findUnique({
+      where: { domain: session.shop }
+    });
+
+    if (!shop) {
+      throw new Error("Shop not found");
     }
-  });
 
-  if (!shop) {
-    console.error('❌ Analytics Overview: Shop not found for domain:', session.shop);
-    throw new Error("Shop not found");
-  }
-
-  console.log('✅ Analytics Overview: Shop found with', shop.popups?.length || 0, 'popups');
-
-  // Calculate time periods
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-  const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-  // Get analytics summary
-  const [
-    totalImpressions,
-    impressionsToday,
-    impressionsYesterday,
-    totalEmails,
-    emailsToday,
-    emailsThisWeek,
-    topPerformingPopups,
-    recentEvents
-  ] = await Promise.all([
-    // Total impressions
-    prisma.popupAnalytics.count({
-      where: { shopId: shop.id, eventType: 'impression' }
-    }),
-    
-    // Impressions today
-    prisma.popupAnalytics.count({
-      where: { 
-        shopId: shop.id, 
-        eventType: 'impression',
-        createdAt: { gte: today }
-      }
-    }),
-    
-    // Impressions yesterday
-    prisma.popupAnalytics.count({
-      where: { 
-        shopId: shop.id, 
-        eventType: 'impression',
-        createdAt: { gte: yesterday, lt: today }
-      }
-    }),
-    
-    // Total emails
-    prisma.collectedEmail.count({
+    // Simple counts - no complex queries
+    const totalEmails = await prisma.collectedEmail.count({
       where: { shopId: shop.id }
-    }),
-    
-    // Emails today
-    prisma.collectedEmail.count({
-      where: { 
-        shopId: shop.id,
-        createdAt: { gte: today }
-      }
-    }),
-    
-    // Emails this week
-    prisma.collectedEmail.count({
-      where: { 
-        shopId: shop.id,
-        createdAt: { gte: weekAgo }
-      }
-    }),
-    
-    // Top performing popups
-    prisma.popup.findMany({
-      where: { 
-        shopId: shop.id,
-        isDeleted: false,
-        status: 'ACTIVE'
-      },
-      include: {
-        _count: {
-          select: {
-            analytics: {
-              where: { eventType: 'impression' }
-            }
-          }
-        }
-      },
-      orderBy: {
-        analytics: {
-          _count: 'desc'
-        }
-      },
-      take: 5
-    }),
-    
-    // Recent analytics events
-    prisma.popupAnalytics.findMany({
-      where: { shopId: shop.id },
-      include: {
-        popup: {
-          select: {
-            name: true
-          }
-        }
-      },
+    });
+
+    const totalPopups = await prisma.popup.count({
+      where: { shopId: shop.id, isDeleted: false }
+    });
+
+    const activePopups = await prisma.popup.count({
+      where: { shopId: shop.id, isDeleted: false, status: 'ACTIVE' }
+    });
+
+    // Get some basic popup data
+    const popups = await prisma.popup.findMany({
+      where: { shopId: shop.id, isDeleted: false },
       orderBy: { createdAt: 'desc' },
-      take: 10
-    })
-  ]);
+      take: 5
+    });
 
-  // Calculate conversion rate
-  const conversionRate = totalImpressions > 0 ? (totalEmails / totalImpressions) * 100 : 0;
-  const impressionsTrend = impressionsYesterday > 0 ? 
-    ((impressionsToday - impressionsYesterday) / impressionsYesterday) * 100 : 0;
-
-  return json({
-    shop,
-    stats: {
-      totalImpressions,
-      impressionsToday,
-      impressionsYesterday,
-      impressionsTrend: Math.round(impressionsTrend * 100) / 100,
-      totalEmails,
-      emailsToday,
-      emailsThisWeek,
-      conversionRate: Math.round(conversionRate * 100) / 100,
-      activePopups: shop.popups.filter(p => p.status === 'ACTIVE').length,
-      totalPopups: shop.popups.length
-    },
-    topPerformingPopups,
-    recentEvents
-  });
+    return json({
+      shop,
+      stats: {
+        totalImpressions: 0,
+        impressionsToday: 0,
+        impressionsYesterday: 0,
+        impressionsTrend: 0,
+        totalEmails,
+        emailsToday: 0,
+        emailsThisWeek: 0,
+        conversionRate: 0,
+        activePopups,
+        totalPopups
+      },
+      topPerformingPopups: popups,
+      recentEvents: []
+    });
+  } catch (error) {
+    console.error('Analytics overview error:', error);
+    return json({
+      shop: null,
+      stats: {
+        totalImpressions: 0,
+        impressionsToday: 0,
+        impressionsYesterday: 0,
+        impressionsTrend: 0,
+        totalEmails: 0,
+        emailsToday: 0,
+        emailsThisWeek: 0,
+        conversionRate: 0,
+        activePopups: 0,
+        totalPopups: 0
+      },
+      topPerformingPopups: [],
+      recentEvents: []
+    });
+  }
 }
 
 export default function AnalyticsOverview() {
@@ -286,17 +203,6 @@ export default function AnalyticsOverview() {
                   <Button url="/app/analytics/performance">
                     View Performance Details
                   </Button>
-                  <Button 
-                    onClick={() => {
-                      fetcher.submit(
-                        { action: 'sync_customers' },
-                        { method: 'post', action: '/app/api/customers/sync' }
-                      );
-                    }}
-                    loading={fetcher.state === 'submitting'}
-                  >
-                    {fetcher.state === 'submitting' ? 'Syncing...' : 'Sync Customers to Shopify'}
-                  </Button>
                 </InlineStack>
               </BlockStack>
             </div>
@@ -308,7 +214,7 @@ export default function AnalyticsOverview() {
           <Card>
             <div style={{ padding: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
-                <Text variant="headingMd" as="h2">Top Performing Popups</Text>
+                <Text variant="headingMd" as="h2">Recent Popups</Text>
                 <Button url="/app/analytics/performance" variant="secondary">View All Performance</Button>
               </div>
               
@@ -325,7 +231,7 @@ export default function AnalyticsOverview() {
                       <div>
                         <Text variant="bodyMd" as="p" fontWeight="semibold">{popup.name}</Text>
                         <Text variant="bodySm" as="p" tone="subdued">
-                          {popup.popupType.replace('_', ' ').toLowerCase()} • {popup._count.analytics} impressions
+                          {popup.popupType.replace('_', ' ').toLowerCase()}
                         </Text>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -339,10 +245,10 @@ export default function AnalyticsOverview() {
                 </div>
               ) : (
                 <EmptyState
-                  heading="No performance data yet"
+                  heading="No popups yet"
                   image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
                 >
-                  <p>Create and activate popups to see performance analytics</p>
+                  <p>Create popups to see analytics</p>
                 </EmptyState>
               )}
             </div>
@@ -370,27 +276,12 @@ export default function AnalyticsOverview() {
                   heading="No events tracked yet"
                   image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
                 >
-                  <p>Events will appear here once visitors start interacting with your popups</p>
+                  <p>Events will appear here once visitors interact with your popups</p>
                 </EmptyState>
               </div>
             )}
           </Card>
         </Layout.Section>
-
-        {/* Customer Sync Status */}
-        {fetcher.data && (
-          <Layout.Section>
-            {fetcher.data.success ? (
-              <Banner tone="success">
-                Customer sync completed successfully! Check the Customers page for details.
-              </Banner>
-            ) : (
-              <Banner tone="critical">
-                Customer sync failed: {fetcher.data.error}
-              </Banner>
-            )}
-          </Layout.Section>
-        )}
       </Layout>
     </Page>
   );

@@ -23,186 +23,81 @@ import prisma from "../db.server";
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
   
-  console.log('🔄 Analytics Funnels: Starting loader for shop:', session.shop);
-  const url = new URL(request.url);
-  const popupId = url.searchParams.get('popupId');
-  const timeframe = url.searchParams.get('timeframe') || '7d';
-
-  const shop = await prisma.shop.findUnique({
-    where: { domain: session.shop },
-    include: {
-      popups: {
-        where: { isDeleted: false },
-        orderBy: { createdAt: 'desc' }
-      }
-    }
-  });
-
-  if (!shop) {
-    console.error('❌ Analytics Funnels: Shop not found for domain:', session.shop);
-    throw new Error("Shop not found");
-  }
-
-  console.log('✅ Analytics Funnels: Shop found with', shop.popups?.length || 0, 'popups');
-
-  // Calculate date range
-  let dateFilter: any = {};
-  if (timeframe !== 'all') {
-    const days = parseInt(timeframe.replace('d', ''));
-    const date = new Date();
-    date.setDate(date.getDate() - days);
-    dateFilter = { createdAt: { gte: date } };
-  }
-
-  // Base filter
-  const baseFilter = {
-    shopId: shop.id,
-    ...(popupId && { popupId }),
-    ...dateFilter
-  };
-
-  // Get funnel analytics data
-  let analytics;
   try {
-    analytics = await Promise.all([
-    // Total funnel impressions
-    prisma.popupAnalytics.count({
-      where: { ...baseFilter, eventType: 'impression' }
-    }),
+    const url = new URL(request.url);
+    const popupId = url.searchParams.get('popupId');
+    const timeframe = url.searchParams.get('timeframe') || '7d';
 
-    // Total interactions (clicks, step views)
-    prisma.popupAnalytics.count({
-      where: { 
-        ...baseFilter, 
-        eventType: { in: ['click', 'button_click', 'step_view'] }
-      }
-    }),
+    const shop = await prisma.shop.findUnique({
+      where: { domain: session.shop }
+    });
 
-    // Total completions
-    prisma.popupAnalytics.count({
-      where: { ...baseFilter, eventType: 'complete' }
-    }),
+    if (!shop) {
+      throw new Error("Shop not found");
+    }
 
-    // Total dropoffs/closes
-    prisma.popupAnalytics.count({
-      where: { ...baseFilter, eventType: 'close' }
-    }),
+    // Simple basic popup data
+    const popups = await prisma.popup.findMany({
+      where: { shopId: shop.id, isDeleted: false },
+      orderBy: { createdAt: 'desc' }
+    });
 
-    // Step-by-step funnel analysis for selected popup
-    popupId ? prisma.$queryRaw`
-      SELECT 
-        pa."stepNumber",
-        COUNT(CASE WHEN pa."eventType" = 'step_view' THEN 1 END) as step_views,
-        COUNT(CASE WHEN pa."eventType" = 'step_complete' THEN 1 END) as step_completions,
-        COUNT(CASE WHEN pa."eventType" = 'close' THEN 1 END) as step_dropoffs
-      FROM "PopupAnalytics" pa
-      WHERE pa."popupId" = ${popupId}
-        AND pa."shopId" = ${shop.id}
-        ${dateFilter.createdAt ? `AND pa."createdAt" >= '${dateFilter.createdAt.gte.toISOString()}'` : ''}
-      GROUP BY pa."stepNumber"
-      ORDER BY pa."stepNumber"
-    ` : [],
-
-    // All popup funnel performance comparison
-    prisma.$queryRaw`
-      SELECT 
-        p.id,
-        p.name,
-        p."popupType",
-        p.status,
-        COALESCE(impressions.count, 0) as impressions,
-        COALESCE(interactions.count, 0) as interactions,
-        COALESCE(completions.count, 0) as completions,
-        COALESCE(dropoffs.count, 0) as dropoffs
-      FROM "Popup" p
-      LEFT JOIN (
-        SELECT "popupId", COUNT(*) as count
-        FROM "PopupAnalytics" 
-        WHERE "shopId" = ${shop.id} 
-          AND "eventType" = 'impression'
-          ${dateFilter.createdAt ? `AND "createdAt" >= '${dateFilter.createdAt.gte.toISOString()}'` : ''}
-        GROUP BY "popupId"
-      ) impressions ON p.id = impressions."popupId"
-      LEFT JOIN (
-        SELECT "popupId", COUNT(*) as count
-        FROM "PopupAnalytics" 
-        WHERE "shopId" = ${shop.id} 
-          AND "eventType" IN ('click', 'button_click', 'step_view')
-          ${dateFilter.createdAt ? `AND "createdAt" >= '${dateFilter.createdAt.gte.toISOString()}'` : ''}
-        GROUP BY "popupId"
-      ) interactions ON p.id = interactions."popupId"
-      LEFT JOIN (
-        SELECT "popupId", COUNT(*) as count
-        FROM "PopupAnalytics" 
-        WHERE "shopId" = ${shop.id} 
-          AND "eventType" = 'complete'
-          ${dateFilter.createdAt ? `AND "createdAt" >= '${dateFilter.createdAt.gte.toISOString()}'` : ''}
-        GROUP BY "popupId"
-      ) completions ON p.id = completions."popupId"
-      LEFT JOIN (
-        SELECT "popupId", COUNT(*) as count
-        FROM "PopupAnalytics" 
-        WHERE "shopId" = ${shop.id} 
-          AND "eventType" = 'close'
-          ${dateFilter.createdAt ? `AND "createdAt" >= '${dateFilter.createdAt.gte.toISOString()}'` : ''}
-        GROUP BY "popupId"
-      ) dropoffs ON p.id = dropoffs."popupId"
-      WHERE p."shopId" = ${shop.id} AND p."isDeleted" = false
-      ORDER BY impressions.count DESC NULLS LAST
-    `,
-
-    // Selected popup details
-    popupId ? prisma.popup.findUnique({
+    // Selected popup if specified
+    const selectedPopup = popupId ? await prisma.popup.findUnique({
       where: { id: popupId },
       include: {
         steps: {
           orderBy: { stepNumber: 'asc' }
         }
       }
-    }) : null
-    ]);
+    }) : null;
 
-    console.log('✅ Analytics Funnels: All database queries completed successfully');
+    return json({
+      shop: { ...shop, popups },
+      selectedPopup,
+      timeframe,
+      metrics: {
+        totalImpressions: 0,
+        totalInteractions: 0,
+        totalCompletions: 0,
+        totalDropoffs: 0,
+        engagementRate: 0,
+        completionRate: 0,
+        dropoffRate: 0,
+        conversionRate: 0
+      },
+      funnelSteps: [],
+      popupFunnels: popups.map((popup: any) => ({
+        id: popup.id,
+        name: popup.name,
+        popupType: popup.popupType,
+        status: popup.status,
+        impressions: 0,
+        interactions: 0,
+        completions: 0,
+        dropoffs: 0
+      }))
+    });
   } catch (error) {
-    console.error('❌ Analytics Funnels: Database query failed:', error);
-    // Return fallback data to prevent complete failure
-    analytics = [0, 0, 0, 0, [], [], null];
+    console.error('Analytics funnels error:', error);
+    return json({
+      shop: null,
+      selectedPopup: null,
+      timeframe: '7d',
+      metrics: {
+        totalImpressions: 0,
+        totalInteractions: 0,
+        totalCompletions: 0,
+        totalDropoffs: 0,
+        engagementRate: 0,
+        completionRate: 0,
+        dropoffRate: 0,
+        conversionRate: 0
+      },
+      funnelSteps: [],
+      popupFunnels: []
+    });
   }
-
-  // Extract results from analytics array
-  const [
-    totalImpressions,
-    totalInteractions,
-    totalCompletions,
-    totalDropoffs,
-    funnelSteps,
-    popupFunnels,
-    selectedPopup
-  ] = analytics;
-
-  // Calculate funnel metrics
-  const engagementRate = totalImpressions > 0 ? (totalInteractions / totalImpressions) * 100 : 0;
-  const completionRate = totalImpressions > 0 ? (totalCompletions / totalImpressions) * 100 : 0;
-  const dropoffRate = totalImpressions > 0 ? (totalDropoffs / totalImpressions) * 100 : 0;
-  const conversionRate = totalInteractions > 0 ? (totalCompletions / totalInteractions) * 100 : 0;
-
-  return json({
-    shop,
-    selectedPopup,
-    timeframe,
-    metrics: {
-      totalImpressions,
-      totalInteractions,
-      totalCompletions,
-      totalDropoffs,
-      engagementRate: Math.round(engagementRate * 100) / 100,
-      completionRate: Math.round(completionRate * 100) / 100,
-      dropoffRate: Math.round(dropoffRate * 100) / 100,
-      conversionRate: Math.round(conversionRate * 100) / 100
-    },
-    funnelSteps,
-    popupFunnels
-  });
 }
 
 export default function AnalyticsFunnels() {
