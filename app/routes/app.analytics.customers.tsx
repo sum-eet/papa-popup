@@ -11,7 +11,6 @@ import {
   Button,
   DataTable,
   EmptyState,
-  InlineStack,
   BlockStack,
   Banner,
   ProgressBar
@@ -22,14 +21,15 @@ import prisma from "../db.server";
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
   
-  try {
-    const shop = await prisma.shop.findUnique({
-      where: { domain: session.shop }
-    });
+  const shop = await prisma.shop.findUnique({
+    where: { domain: session.shop }
+  });
 
-    if (!shop) {
-      throw new Error("Shop not found");
-    }
+  if (!shop) {
+    throw new Error("Shop not found");
+  }
+
+  try {
 
     // Simple customer counts
     const totalCustomers = await prisma.collectedEmail.count({
@@ -84,7 +84,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function AnalyticsCustomers() {
-  const { shop, stats, syncSummary, recentCustomers, topCustomerJourneys } = useLoaderData<typeof loader>();
+  const { stats, syncSummary, recentCustomers } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
 
   // Bulk sync handler

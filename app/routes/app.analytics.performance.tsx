@@ -1,7 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useLoaderData, useSearchParams } from "@remix-run/react";
-import { useState } from "react";
 import {
   Page,
   Layout,
@@ -14,9 +13,7 @@ import {
   DataTable,
   EmptyState,
   InlineStack,
-  BlockStack,
-  ProgressBar,
-  Divider
+  BlockStack
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -24,24 +21,25 @@ import prisma from "../db.server";
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
   
-  try {
-    const url = new URL(request.url);
-    const popupId = url.searchParams.get('popupId');
-    const timeframe = url.searchParams.get('timeframe') || '7d';
+  const url = new URL(request.url);
+  const popupId = url.searchParams.get('popupId');
+  const timeframe = url.searchParams.get('timeframe') || '7d';
 
-    const shop = await prisma.shop.findUnique({
-      where: { domain: session.shop },
-      include: {
-        popups: {
-          where: { isDeleted: false },
-          orderBy: { createdAt: 'desc' }
-        }
+  const shop = await prisma.shop.findUnique({
+    where: { domain: session.shop },
+    include: {
+      popups: {
+        where: { isDeleted: false },
+        orderBy: { createdAt: 'desc' }
       }
-    });
-
-    if (!shop) {
-      throw new Error("Shop not found");
     }
+  });
+
+  if (!shop) {
+    throw new Error("Shop not found");
+  }
+
+  try {
 
     // Simple performance data
     const selectedPopup = popupId ? await prisma.popup.findUnique({
@@ -110,7 +108,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function AnalyticsPerformance() {
-  const { shop, selectedPopup, timeframe, metrics, stepAnalytics, popupPerformance } = useLoaderData<typeof loader>();
+  const { shop, selectedPopup, timeframe, metrics, popupPerformance } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
   
   const popupOptions = [

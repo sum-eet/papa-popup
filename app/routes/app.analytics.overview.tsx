@@ -1,7 +1,6 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData, useFetcher } from "@remix-run/react";
-import { useState } from "react";
+import { useLoaderData } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -10,13 +9,10 @@ import {
   Grid,
   Badge,
   Button,
-  Select,
   DataTable,
-  Banner,
   EmptyState,
   InlineStack,
-  BlockStack,
-  Spinner
+  BlockStack
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -24,14 +20,15 @@ import prisma from "../db.server";
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
   
-  try {
-    const shop = await prisma.shop.findUnique({
-      where: { domain: session.shop }
-    });
+  const shop = await prisma.shop.findUnique({
+    where: { domain: session.shop }
+  });
 
-    if (!shop) {
-      throw new Error("Shop not found");
-    }
+  if (!shop) {
+    throw new Error("Shop not found");
+  }
+
+  try {
 
     // Simple counts - no complex queries
     const totalEmails = await prisma.collectedEmail.count({
@@ -93,16 +90,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function AnalyticsOverview() {
-  const { shop, stats, topPerformingPopups, recentEvents } = useLoaderData<typeof loader>();
-  const [timeframe, setTimeframe] = useState('7d');
-  const fetcher = useFetcher();
-
-  const timeframeOptions = [
-    { label: 'Last 7 days', value: '7d' },
-    { label: 'Last 30 days', value: '30d' },
-    { label: 'Last 90 days', value: '90d' },
-    { label: 'All time', value: 'all' }
-  ];
+  const { stats, topPerformingPopups, recentEvents } = useLoaderData<typeof loader>();
 
   // Prepare recent events table
   const eventsTableRows = recentEvents.map((event: any) => [

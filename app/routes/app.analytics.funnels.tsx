@@ -23,18 +23,19 @@ import prisma from "../db.server";
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
   
+  const url = new URL(request.url);
+  const popupId = url.searchParams.get('popupId');
+  const timeframe = url.searchParams.get('timeframe') || '7d';
+
+  const shop = await prisma.shop.findUnique({
+    where: { domain: session.shop }
+  });
+
+  if (!shop) {
+    throw new Error("Shop not found");
+  }
+
   try {
-    const url = new URL(request.url);
-    const popupId = url.searchParams.get('popupId');
-    const timeframe = url.searchParams.get('timeframe') || '7d';
-
-    const shop = await prisma.shop.findUnique({
-      where: { domain: session.shop }
-    });
-
-    if (!shop) {
-      throw new Error("Shop not found");
-    }
 
     // Simple basic popup data
     const popups = await prisma.popup.findMany({
@@ -140,7 +141,6 @@ export default function AnalyticsFunnels() {
     const impressions = parseInt(popup.impressions) || 0;
     const interactions = parseInt(popup.interactions) || 0;
     const completions = parseInt(popup.completions) || 0;
-    const dropoffs = parseInt(popup.dropoffs) || 0;
     
     const engagementRate = impressions > 0 ? (interactions / impressions) * 100 : 0;
     const completionRate = impressions > 0 ? (completions / impressions) * 100 : 0;
