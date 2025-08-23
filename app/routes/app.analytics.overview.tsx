@@ -1,263 +1,166 @@
-import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useRouteError } from "@remix-run/react";
-import { boundary } from "@shopify/shopify-app-remix/server";
-import {
-  Page,
-  Layout,
-  Card,
+import { type LoaderFunctionArgs } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
+import { 
+  Page, 
+  Layout, 
+  Card, 
   Text,
   Grid,
   Badge,
   Button,
-  DataTable,
-  EmptyState,
-  InlineStack,
-  BlockStack
+  EmptyState
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
+import { isMultiPopupEnabled } from "../utils/features";
+import { redirect } from "@remix-run/node";
 import prisma from "../db.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  // Check feature flag like working routes do
+  if (!isMultiPopupEnabled()) {
+    return redirect("/app");
+  }
+
   const { session } = await authenticate.admin(request);
   
+  // Get shop data like working routes do
   const shop = await prisma.shop.findUnique({
-    where: { domain: session.shop }
+    where: { domain: session.shop },
+    include: {
+      popups: {
+        where: { isDeleted: false },
+        orderBy: { updatedAt: 'desc' }
+      },
+      emails: {
+        take: 10,
+        orderBy: { createdAt: 'desc' }
+      }
+    }
   });
 
   if (!shop) {
     throw new Error("Shop not found");
   }
 
-  // Simple counts - no complex queries
-  const totalEmails = await prisma.collectedEmail.count({
-    where: { shopId: shop.id }
-  });
+  // Simple stats calculation
+  const totalEmails = shop.emails.length;
+  const totalPopups = shop.popups.length;
+  const activePopups = shop.popups.filter(p => p.status === 'ACTIVE').length;
 
-  const totalPopups = await prisma.popup.count({
-    where: { shopId: shop.id, isDeleted: false }
-  });
-
-  const activePopups = await prisma.popup.count({
-    where: { shopId: shop.id, isDeleted: false, status: 'ACTIVE' }
-  });
-
-  // Get some basic popup data
-  const popups = await prisma.popup.findMany({
-    where: { shopId: shop.id, isDeleted: false },
-    orderBy: { createdAt: 'desc' },
-    take: 5
-  });
-
-  return {
+  return { 
     shop,
     stats: {
-      totalImpressions: 0,
-      impressionsToday: 0,
-      impressionsYesterday: 0,
-      impressionsTrend: 0,
       totalEmails,
-      emailsToday: 0,
-      emailsThisWeek: 0,
-      conversionRate: 0,
-      activePopups,
-      totalPopups
-    },
-    topPerformingPopups: popups,
-    recentEvents: []
+      totalPopups,
+      activePopups
+    }
   };
 }
 
 export default function AnalyticsOverview() {
-  const { stats, topPerformingPopups, recentEvents } = useLoaderData<typeof loader>();
-
-  // Prepare recent events table
-  const eventsTableRows = recentEvents.map((event: any) => [
-    <Badge key={`event-${event.id}`} tone={
-      event.eventType === 'impression' ? 'info' :
-      event.eventType === 'complete' ? 'success' :
-      event.eventType === 'close' ? 'critical' : 'attention'
-    }>
-      {event.eventType}
-    </Badge>,
-    <Text key={`popup-${event.id}`} variant="bodyMd" as="p">
-      {event.popup?.name || 'Unknown Popup'}
-    </Text>,
-    <Text key={`step-${event.id}`} variant="bodyMd" as="p">
-      {event.stepNumber || '-'}
-    </Text>,
-    <Text key={`time-${event.id}`} variant="bodySm" as="p" tone="subdued">
-      {new Date(event.createdAt).toLocaleString()}
-    </Text>
-  ]);
+  const { shop, stats } = useLoaderData<typeof loader>();
 
   return (
     <Page
       title="Analytics Overview"
-      subtitle="Track your popup performance and customer engagement"
-      secondaryActions={[
-        { content: 'Performance Details', url: '/app/analytics/performance' },
-        { content: 'Customer Insights', url: '/app/analytics/customers' },
-        { content: 'Funnel Analysis', url: '/app/analytics/funnels' }
-      ]}
+      subtitle="Basic analytics for your popups"
+      backAction={{ content: 'Dashboard', url: '/app' }}
     >
       <Layout>
         {/* Key Metrics */}
         <Layout.Section>
           <Grid>
-            <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+            <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 4, xl: 4 }}>
               <Card>
                 <div style={{ padding: '20px', textAlign: 'center' }}>
-                  <Text variant="headingLg" as="h3">{stats.totalImpressions.toLocaleString()}</Text>
-                  <Text variant="bodyMd" as="p" tone="subdued">Total Impressions</Text>
-                  {stats.impressionsTrend !== 0 && (
-                    <Text variant="bodySm" as="p" tone={stats.impressionsTrend > 0 ? "success" : "critical"}>
-                      {stats.impressionsTrend > 0 ? '+' : ''}{stats.impressionsTrend}% vs yesterday
-                    </Text>
-                  )}
-                </div>
-              </Card>
-            </Grid.Cell>
-            
-            <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-              <Card>
-                <div style={{ padding: '20px', textAlign: 'center' }}>
-                  <Text variant="headingLg" as="h3">{stats.totalEmails.toLocaleString()}</Text>
+                  <Text variant="headingLg" as="h3">{stats.totalEmails}</Text>
                   <Text variant="bodyMd" as="p" tone="subdued">Total Emails</Text>
-                  <Text variant="bodySm" as="p" tone="success">
-                    {stats.emailsToday} today • {stats.emailsThisWeek} this week
-                  </Text>
                 </div>
               </Card>
             </Grid.Cell>
             
-            <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-              <Card>
-                <div style={{ padding: '20px', textAlign: 'center' }}>
-                  <Text variant="headingLg" as="h3">{stats.conversionRate}%</Text>
-                  <Text variant="bodyMd" as="p" tone="subdued">Conversion Rate</Text>
-                  <Text variant="bodySm" as="p" tone="subdued">
-                    {stats.totalEmails} emails / {stats.totalImpressions} impressions
-                  </Text>
-                </div>
-              </Card>
-            </Grid.Cell>
-            
-            <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+            <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 4, xl: 4 }}>
               <Card>
                 <div style={{ padding: '20px', textAlign: 'center' }}>
                   <Text variant="headingLg" as="h3">{stats.activePopups}</Text>
                   <Text variant="bodyMd" as="p" tone="subdued">Active Popups</Text>
-                  <Text variant="bodySm" as="p" tone="subdued">
-                    {stats.totalPopups} total popups created
-                  </Text>
+                </div>
+              </Card>
+            </Grid.Cell>
+            
+            <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 4, xl: 4 }}>
+              <Card>
+                <div style={{ padding: '20px', textAlign: 'center' }}>
+                  <Text variant="headingLg" as="h3">{stats.totalPopups}</Text>
+                  <Text variant="bodyMd" as="p" tone="subdued">Total Popups</Text>
                 </div>
               </Card>
             </Grid.Cell>
           </Grid>
         </Layout.Section>
 
-        {/* Quick Actions */}
+        {/* Recent Popups */}
         <Layout.Section>
           <Card>
             <div style={{ padding: '20px' }}>
-              <BlockStack gap="400">
-                <Text variant="headingMd" as="h2">Quick Actions</Text>
-                <InlineStack gap="300">
-                  <Button url="/app/popups/new" variant="primary">
-                    Create New Popup
-                  </Button>
-                  <Button url="/app/analytics/performance">
-                    View Performance Details
-                  </Button>
-                </InlineStack>
-              </BlockStack>
-            </div>
-          </Card>
-        </Layout.Section>
-
-        {/* Top Performing Popups */}
-        <Layout.Section>
-          <Card>
-            <div style={{ padding: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
-                <Text variant="headingMd" as="h2">Recent Popups</Text>
-                <Button url="/app/analytics/performance" variant="secondary">View All Performance</Button>
-              </div>
+              <Text variant="headingMd" as="h2">Recent Popups</Text>
               
-              {topPerformingPopups.length > 0 ? (
-                <div>
-                  {topPerformingPopups.map((popup: any, index: number) => (
+              {shop.popups.length > 0 ? (
+                <div style={{ marginTop: '16px' }}>
+                  {shop.popups.slice(0, 5).map((popup: any) => (
                     <div key={popup.id} style={{ 
                       padding: '12px 0', 
-                      borderBottom: index < topPerformingPopups.length - 1 ? '1px solid #e1e5e9' : 'none',
+                      borderBottom: '1px solid #e1e5e9',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between'
                     }}>
                       <div>
-                        <Text variant="bodyMd" as="p" fontWeight="semibold">{popup.name}</Text>
+                        <Text variant="bodyMd" as="p">{popup.name}</Text>
                         <Text variant="bodySm" as="p" tone="subdued">
-                          {popup.popupType.replace('_', ' ').toLowerCase()}
+                          {popup.status.toLowerCase()} • Updated {new Date(popup.updatedAt).toLocaleDateString()}
                         </Text>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <Badge tone="success">{popup.status.toLowerCase()}</Badge>
-                        <Button size="micro" url={`/app/analytics/performance?popupId=${popup.id}`}>
-                          View Analytics
-                        </Button>
-                      </div>
+                      <Badge tone={popup.status === 'ACTIVE' ? 'success' : 'attention'}>
+                        {popup.status.toLowerCase()}
+                      </Badge>
                     </div>
                   ))}
                 </div>
               ) : (
-                <EmptyState
-                  heading="No popups yet"
-                  image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-                >
-                  <p>Create popups to see analytics</p>
-                </EmptyState>
+                <div style={{ marginTop: '16px' }}>
+                  <EmptyState
+                    heading="No popups created yet"
+                    image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                  >
+                    <p>Create your first popup to see analytics</p>
+                    <div style={{ marginTop: '15px' }}>
+                      <Button variant="primary" url="/app/popups/new">Create Your First Popup</Button>
+                    </div>
+                  </EmptyState>
+                </div>
               )}
             </div>
           </Card>
         </Layout.Section>
 
-        {/* Recent Events */}
+        {/* Quick Actions */}
         <Layout.Section>
           <Card>
             <div style={{ padding: '20px' }}>
-              <Text variant="headingMd" as="h2">Recent Events</Text>
+              <Text variant="headingMd" as="h2">Quick Actions</Text>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+                <Button url="/app/popups" variant="secondary">
+                  📋 Manage Popups
+                </Button>
+                <Button url="/app/popups/new" variant="primary">
+                  ➕ Create New Popup
+                </Button>
+              </div>
             </div>
-            {recentEvents.length > 0 ? (
-              <div style={{ overflowX: 'auto' }}>
-                <DataTable
-                  columnContentTypes={['text', 'text', 'text', 'text']}
-                  headings={['Event Type', 'Popup', 'Step', 'Time']}
-                  rows={eventsTableRows}
-                  hasZebraStriping
-                />
-              </div>
-            ) : (
-              <div style={{ padding: '20px' }}>
-                <EmptyState
-                  heading="No events tracked yet"
-                  image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-                >
-                  <p>Events will appear here once visitors interact with your popups</p>
-                </EmptyState>
-              </div>
-            )}
           </Card>
         </Layout.Section>
       </Layout>
     </Page>
   );
 }
-
-// Shopify needs Remix to catch some thrown responses, so that their headers are included in the response.
-export function ErrorBoundary() {
-  return boundary.error(useRouteError());
-}
-
-export const headers: HeadersFunction = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};
