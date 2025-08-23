@@ -1,6 +1,5 @@
-import type { HeadersFunction, LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useSearchParams, useRouteError } from "@remix-run/react";
-import { boundary } from "@shopify/shopify-app-remix/server";
+import type { LoaderFunctionArgs } from "@remix-run/node";
+import { useLoaderData, useSearchParams } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -16,9 +15,16 @@ import {
   BlockStack
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
+import { isMultiPopupEnabled } from "../utils/features";
+import { redirect } from "@remix-run/node";
 import prisma from "../db.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  // Check if analytics are available (only in multi-popup mode)
+  if (!isMultiPopupEnabled()) {
+    return redirect("/app");
+  }
+
   const { session } = await authenticate.admin(request);
   
   const url = new URL(request.url);
@@ -271,11 +277,3 @@ export default function AnalyticsPerformance() {
   );
 }
 
-// Shopify needs Remix to catch some thrown responses, so that their headers are included in the response.
-export function ErrorBoundary() {
-  return boundary.error(useRouteError());
-}
-
-export const headers: HeadersFunction = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};

@@ -42,8 +42,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
     throw new Error("Shop not found");
   }
 
-  // Simple stats calculation
-  const totalEmails = shop.emails.length;
+  // Get total email count from database (not just the 10 fetched)
+  const totalEmailsCount = await prisma.email.count({
+    where: { shopDomain: session.shop }
+  });
+  const totalEmails = totalEmailsCount;
   const totalPopups = shop.popups.length;
   const activePopups = shop.popups.filter(p => p.status === 'ACTIVE').length;
 
