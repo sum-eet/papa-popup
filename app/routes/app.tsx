@@ -33,10 +33,7 @@ export default function App() {
           Dashboard
         </Link>
         <Link to="/app/popups">Popups</Link>
-        <Link to="/app/analytics/overview">Analytics</Link>
-        <Link to="/app/analytics/performance">Performance</Link>
-        <Link to="/app/analytics/customers">Customers</Link>
-        <Link to="/app/analytics/funnels">Funnels</Link>
+        <Link to="/app/analytics-working">Analytics</Link>
       </NavMenu>
       <Outlet />
     </AppProvider>
