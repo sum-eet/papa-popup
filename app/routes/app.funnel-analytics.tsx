@@ -41,10 +41,58 @@ export async function loader({ request }: LoaderFunctionArgs) {
     throw new Error("Shop not found");
   }
 
-  // Calculate analytics stats
+  // Calculate basic stats (existing working logic)
   const totalEmails = shop.emails.length;
   const activePopups = shop.popups.filter(p => p.status === 'ACTIVE').length;
   const totalPopups = shop.popups.length;
+
+  // Add PopupAnalytics data safely
+  let funnelData = {
+    impressions: 0,
+    clicks: 0,
+    conversions: 0,
+    clickRate: 0,
+    conversionRate: 0
+  };
+
+  try {
+    // Get basic funnel metrics from PopupAnalytics
+    const impressionsCount = await prisma.popupAnalytics.count({
+      where: {
+        shopId: shop.id,
+        eventType: 'impression'
+      }
+    });
+
+    const clicksCount = await prisma.popupAnalytics.count({
+      where: {
+        shopId: shop.id,
+        eventType: 'click'
+      }
+    });
+
+    const conversionsCount = await prisma.popupAnalytics.count({
+      where: {
+        shopId: shop.id,
+        eventType: 'complete'
+      }
+    });
+
+    // Calculate rates safely
+    const clickRate = impressionsCount > 0 ? Math.round((clicksCount / impressionsCount) * 100) : 0;
+    const conversionRate = clicksCount > 0 ? Math.round((conversionsCount / clicksCount) * 100) : 0;
+
+    funnelData = {
+      impressions: impressionsCount,
+      clicks: clicksCount,
+      conversions: conversionsCount,
+      clickRate,
+      conversionRate
+    };
+  } catch (error) {
+    console.log('PopupAnalytics query error:', error);
+    // Keep default values if queries fail
+  }
 
   return { 
     shop,
@@ -53,12 +101,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
       activePopups, 
       totalPopups
     },
+    funnelData,
     recentEmails: shop.emails
   };
 }
 
 export default function FunnelAnalytics() {
-  const { shop, stats, recentEmails } = useLoaderData<typeof loader>();
+  const { shop, stats, funnelData, recentEmails } = useLoaderData<typeof loader>();
 
   // Prepare recent emails table rows
   const emailRows = recentEmails.map((email: any) => [
@@ -85,25 +134,40 @@ export default function FunnelAnalytics() {
       <Layout>
         {/* Stats Cards */}
         <Layout.Section>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
             <Card>
               <div style={{ padding: '20px', textAlign: 'center' }}>
                 <Text variant="headingXl" as="p">{stats.totalEmails}</Text>
-                <Text variant="bodyMd" as="p" tone="subdued">Total Emails Collected</Text>
+                <Text variant="bodyMd" as="p" tone="subdued">📧 Emails Collected</Text>
+              </div>
+            </Card>
+            
+            <Card>
+              <div style={{ padding: '20px', textAlign: 'center' }}>
+                <Text variant="headingXl" as="p">{funnelData.impressions.toLocaleString()}</Text>
+                <Text variant="bodyMd" as="p" tone="subdued">👁️ Total Impressions</Text>
+              </div>
+            </Card>
+            
+            <Card>
+              <div style={{ padding: '20px', textAlign: 'center' }}>
+                <Text variant="headingXl" as="p">{funnelData.clicks.toLocaleString()}</Text>
+                <Text variant="bodyMd" as="p" tone="subdued">🖱️ Clicks</Text>
+                <Text variant="bodySm" as="p" tone="subdued">{funnelData.clickRate}% click rate</Text>
               </div>
             </Card>
             
             <Card>
               <div style={{ padding: '20px', textAlign: 'center' }}>
                 <Text variant="headingXl" as="p">{stats.activePopups}</Text>
-                <Text variant="bodyMd" as="p" tone="subdued">Active Popups</Text>
+                <Text variant="bodyMd" as="p" tone="subdued">🟢 Active Popups</Text>
               </div>
             </Card>
             
             <Card>
               <div style={{ padding: '20px', textAlign: 'center' }}>
                 <Text variant="headingXl" as="p">{stats.totalPopups}</Text>
-                <Text variant="bodyMd" as="p" tone="subdued">Total Popups</Text>
+                <Text variant="bodyMd" as="p" tone="subdued">📊 Total Popups</Text>
               </div>
             </Card>
           </div>
