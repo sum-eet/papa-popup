@@ -22,7 +22,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const { session } = await authenticate.admin(request);
   
-  // Get funnel data for this shop
+  // Get analytics data for this shop
   const shop = await prisma.shop.findUnique({
     where: { domain: session.shop },
     include: {
@@ -30,8 +30,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
         where: { isDeleted: false },
         orderBy: { updatedAt: 'desc' }
       },
-      customerSessions: {
-        take: 100,
+      emails: {
+        take: 50,
         orderBy: { createdAt: 'desc' }
       }
     }
@@ -41,214 +41,95 @@ export async function loader({ request }: LoaderFunctionArgs) {
     throw new Error("Shop not found");
   }
 
-  // Form complexity analysis
-  const oneStepForms = shop.popups.filter(p => p.totalSteps === 1).length;
-  const twoStepForms = shop.popups.filter(p => p.totalSteps === 2).length;
-  const threeStepForms = shop.popups.filter(p => p.totalSteps >= 3).length;
+  // Calculate analytics stats
+  const totalEmails = shop.emails.length;
+  const activePopups = shop.popups.filter(p => p.status === 'ACTIVE').length;
+  const totalPopups = shop.popups.length;
 
-  // Customer session analysis
-  const totalSessions = shop.customerSessions.length;
-  const completedSessions = shop.customerSessions.filter(s => s.completedAt !== null).length;
-  const emailProvidedSessions = shop.customerSessions.filter(s => s.emailProvided).length;
-  const discountGeneratedSessions = shop.customerSessions.filter(s => s.discountCode !== null).length;
-
-  // Step progression analysis
-  const sessionsStep1 = shop.customerSessions.filter(s => s.stepsViewed >= 1).length;
-  const sessionsStep2 = shop.customerSessions.filter(s => s.stepsViewed >= 2).length;
-  const sessionsStep3 = shop.customerSessions.filter(s => s.stepsViewed >= 3).length;
-
-  // Calculate rates
-  const emailCaptureRate = totalSessions > 0 ? (emailProvidedSessions / totalSessions) * 100 : 0;
-  const completionRate = totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0;
-  const discountGenerationRate = totalSessions > 0 ? (discountGeneratedSessions / totalSessions) * 100 : 0;
-
-  return {
+  return { 
     shop,
-    funnelStats: {
-      // Form complexity
-      oneStepForms,
-      twoStepForms,
-      threeStepForms,
-      totalForms: shop.popups.length,
-      
-      // Session metrics
-      totalSessions,
-      completedSessions,
-      emailProvidedSessions,
-      discountGeneratedSessions,
-      
-      // Step progression
-      sessionsStep1,
-      sessionsStep2,
-      sessionsStep3,
-      
-      // Conversion rates
-      emailCaptureRate: Math.round(emailCaptureRate * 100) / 100,
-      completionRate: Math.round(completionRate * 100) / 100,
-      discountGenerationRate: Math.round(discountGenerationRate * 100) / 100
+    stats: {
+      totalEmails,
+      activePopups, 
+      totalPopups
     },
-    recentSessions: shop.customerSessions.slice(0, 10)
+    recentEmails: shop.emails
   };
 }
 
-
 export default function FunnelAnalytics() {
-  const { shop, funnelStats, recentSessions } = useLoaderData<typeof loader>();
+  const { shop, stats, recentEmails } = useLoaderData<typeof loader>();
 
-  // Prepare recent sessions table rows
-  const sessionRows = recentSessions.map((session: any) => [
-    <Text key={`session-${session.id}`} variant="bodyMd" as="p" fontWeight="semibold">
-      {session.sessionToken.slice(0, 8)}...
+  // Prepare recent emails table rows
+  const emailRows = recentEmails.map((email: any) => [
+    <Text key={`email-${email.id}`} variant="bodyMd" as="p" fontWeight="semibold">
+      {email.email}
     </Text>,
-    <Text key={`steps-${session.id}`} variant="bodyMd" as="p">
-      {session.stepsViewed} / {session.stepsCompleted}
+    <Text key={`source-${email.id}`} variant="bodyMd" as="p">
+      {email.popupId ? `Popup: ${email.popupId.slice(0, 8)}...` : 'Direct'}
     </Text>,
-    <Text key={`email-${session.id}`} variant="bodyMd" as="p">
-      {session.emailProvided ? '✅ Yes' : '❌ No'}
-    </Text>,
-    <Text key={`discount-${session.id}`} variant="bodyMd" as="p">
-      {session.discountCode ? '🎟️ Generated' : '❌ None'}
-    </Text>,
-    <Text key={`status-${session.id}`} variant="bodyMd" as="p">
-      {session.completedAt ? '✅ Completed' : '⏳ In Progress'}
-    </Text>,
-    <Text key={`date-${session.id}`} variant="bodySm" as="p" tone="subdued">
-      {new Date(session.createdAt).toLocaleDateString()}
+    <Text key={`date-${email.id}`} variant="bodyMd" as="p">
+      {new Date(email.createdAt).toLocaleDateString()}
     </Text>
   ]);
 
   return (
     <Page
-      title="Conversion Funnel Analytics"
-      subtitle="Track user journey and conversion patterns across your popup forms"
+      title="Funnel Analytics"
+      subtitle="Basic funnel insights for your popup campaigns"
       backAction={{
         content: 'Dashboard',
         url: '/app'
       }}
     >
       <Layout>
-        {/* Form Complexity Analysis */}
-        <Layout.Section>
-          <Card>
-            <div style={{ padding: '20px' }}>
-              <Text variant="headingMd" as="h2">Form Complexity Distribution</Text>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px', marginTop: '16px' }}>
-                <div style={{ textAlign: 'center', padding: '16px', backgroundColor: '#f6f6f7', borderRadius: '8px' }}>
-                  <Text variant="headingLg" as="p">{funnelStats.oneStepForms}</Text>
-                  <Text variant="bodyMd" as="p" tone="subdued">1-Step Forms</Text>
-                </div>
-                <div style={{ textAlign: 'center', padding: '16px', backgroundColor: '#f6f6f7', borderRadius: '8px' }}>
-                  <Text variant="headingLg" as="p">{funnelStats.twoStepForms}</Text>
-                  <Text variant="bodyMd" as="p" tone="subdued">2-Step Forms</Text>
-                </div>
-                <div style={{ textAlign: 'center', padding: '16px', backgroundColor: '#f6f6f7', borderRadius: '8px' }}>
-                  <Text variant="headingLg" as="p">{funnelStats.threeStepForms}</Text>
-                  <Text variant="bodyMd" as="p" tone="subdued">3+ Step Forms</Text>
-                </div>
-                <div style={{ textAlign: 'center', padding: '16px', backgroundColor: '#e3f2fd', borderRadius: '8px' }}>
-                  <Text variant="headingLg" as="p">{funnelStats.totalForms}</Text>
-                  <Text variant="bodyMd" as="p" tone="subdued">Total Forms</Text>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </Layout.Section>
-
-        {/* Conversion Funnel Stats */}
+        {/* Stats Cards */}
         <Layout.Section>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
             <Card>
               <div style={{ padding: '20px', textAlign: 'center' }}>
-                <Text variant="headingXl" as="p">{funnelStats.totalSessions}</Text>
-                <Text variant="bodyMd" as="p" tone="subdued">Total Sessions Started</Text>
+                <Text variant="headingXl" as="p">{stats.totalEmails}</Text>
+                <Text variant="bodyMd" as="p" tone="subdued">Total Emails Collected</Text>
               </div>
             </Card>
             
             <Card>
               <div style={{ padding: '20px', textAlign: 'center' }}>
-                <Text variant="headingXl" as="p">{funnelStats.emailProvidedSessions}</Text>
-                <Text variant="bodyMd" as="p" tone="subdued">Emails Captured</Text>
-                <Text variant="bodySm" as="p" tone="success">{funnelStats.emailCaptureRate}% rate</Text>
+                <Text variant="headingXl" as="p">{stats.activePopups}</Text>
+                <Text variant="bodyMd" as="p" tone="subdued">Active Popups</Text>
               </div>
             </Card>
             
             <Card>
               <div style={{ padding: '20px', textAlign: 'center' }}>
-                <Text variant="headingXl" as="p">{funnelStats.discountGeneratedSessions}</Text>
-                <Text variant="bodyMd" as="p" tone="subdued">Discounts Generated</Text>
-                <Text variant="bodySm" as="p" tone="success">{funnelStats.discountGenerationRate}% rate</Text>
-              </div>
-            </Card>
-            
-            <Card>
-              <div style={{ padding: '20px', textAlign: 'center' }}>
-                <Text variant="headingXl" as="p">{funnelStats.completedSessions}</Text>
-                <Text variant="bodyMd" as="p" tone="subdued">Sessions Completed</Text>
-                <Text variant="bodySm" as="p" tone="success">{funnelStats.completionRate}% rate</Text>
+                <Text variant="headingXl" as="p">{stats.totalPopups}</Text>
+                <Text variant="bodyMd" as="p" tone="subdued">Total Popups</Text>
               </div>
             </Card>
           </div>
         </Layout.Section>
 
-        {/* Step Progression Funnel */}
+        {/* Recent Emails */}
         <Layout.Section>
           <Card>
             <div style={{ padding: '20px' }}>
-              <Text variant="headingMd" as="h2">Step Progression Funnel</Text>
-              <Text variant="bodyMd" as="p" tone="subdued" style={{ marginTop: '8px' }}>
-                Track how users progress through each step of your forms
-              </Text>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '24px', padding: '0 20px' }}>
-                <div style={{ textAlign: 'center', flex: 1 }}>
-                  <div style={{ width: '60px', height: '60px', backgroundColor: '#007cba', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', marginBottom: '8px' }}>
-                    <Text variant="headingMd" as="p">{funnelStats.sessionsStep1}</Text>
-                  </div>
-                  <Text variant="bodyMd" as="p">Step 1 Views</Text>
-                </div>
-                
-                <div style={{ flex: 0.5, textAlign: 'center', color: '#666' }}>→</div>
-                
-                <div style={{ textAlign: 'center', flex: 1 }}>
-                  <div style={{ width: '60px', height: '60px', backgroundColor: '#46a049', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', marginBottom: '8px' }}>
-                    <Text variant="headingMd" as="p">{funnelStats.sessionsStep2}</Text>
-                  </div>
-                  <Text variant="bodyMd" as="p">Step 2 Views</Text>
-                </div>
-                
-                <div style={{ flex: 0.5, textAlign: 'center', color: '#666' }}>→</div>
-                
-                <div style={{ textAlign: 'center', flex: 1 }}>
-                  <div style={{ width: '60px', height: '60px', backgroundColor: '#ff9800', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', marginBottom: '8px' }}>
-                    <Text variant="headingMd" as="p">{funnelStats.sessionsStep3}</Text>
-                  </div>
-                  <Text variant="bodyMd" as="p">Step 3+ Views</Text>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </Layout.Section>
-
-        {/* Recent Sessions */}
-        <Layout.Section>
-          <Card>
-            <div style={{ padding: '20px' }}>
-              <Text variant="headingMd" as="h2">Recent Customer Sessions</Text>
-              {recentSessions.length > 0 ? (
+              <Text variant="headingMd" as="h2">Recent Email Captures</Text>
+              {recentEmails.length > 0 ? (
                 <div style={{ marginTop: '16px', overflowX: 'auto' }}>
                   <DataTable
-                    columnContentTypes={['text', 'text', 'text', 'text', 'text', 'text']}
-                    headings={['Session ID', 'Steps (Viewed/Completed)', 'Email Provided', 'Discount', 'Status', 'Date']}
-                    rows={sessionRows}
+                    columnContentTypes={['text', 'text', 'text']}
+                    headings={['Email', 'Source', 'Date']}
+                    rows={emailRows}
                     hasZebraStriping
                   />
                 </div>
               ) : (
                 <div style={{ marginTop: '16px' }}>
                   <EmptyState
-                    heading="No customer sessions yet"
+                    heading="No emails captured yet"
                     image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
                   >
-                    <p>Customer session data will appear here once users start interacting with your popups</p>
+                    <p>Start capturing emails by activating your popups</p>
                     <div style={{ marginTop: '16px' }}>
                       <Button variant="primary" url="/app/popups">
                         Manage Popups
@@ -257,6 +138,26 @@ export default function FunnelAnalytics() {
                   </EmptyState>
                 </div>
               )}
+            </div>
+          </Card>
+        </Layout.Section>
+
+        {/* Basic Funnel Insight */}
+        <Layout.Section>
+          <Card>
+            <div style={{ padding: '20px' }}>
+              <Text variant="headingMd" as="h2">Funnel Overview</Text>
+              <div style={{ marginTop: '16px' }}>
+                <div style={{ padding: '16px', backgroundColor: '#f6f6f7', borderRadius: '8px' }}>
+                  <Text variant="bodyMd" as="p" fontWeight="semibold">
+                    Email Collection Rate
+                  </Text>
+                  <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '4px' }}>
+                    You have collected {stats.totalEmails} emails across {stats.totalPopups} popups.
+                    {stats.activePopups > 0 ? ` ${stats.activePopups} popups are currently active.` : ' No popups are currently active.'}
+                  </Text>
+                </div>
+              </div>
             </div>
           </Card>
         </Layout.Section>
