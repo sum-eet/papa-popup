@@ -34,6 +34,7 @@ export default function App() {
         </Link>
         <Link to="/app/popups">Popups</Link>
         <Link to="/app/analytics-working">Analytics</Link>
+        <Link to="/app/funnel-analytics">Funnel Analytics</Link>
       </NavMenu>
       <Outlet />
     </AppProvider>
