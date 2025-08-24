@@ -19,6 +19,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
   try {
     const data = await request.json();
+    console.log("Analytics API: Received data:", data);
+    
     const { 
       eventType,
       shopDomain, 
@@ -32,6 +34,7 @@ export async function action({ request }: ActionFunctionArgs) {
     } = data;
 
     if (!eventType || !shopDomain) {
+      console.error("Analytics API: Missing required fields:", { eventType, shopDomain });
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -42,11 +45,13 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     // Find shop
+    console.log("Analytics API: Looking for shop:", shopDomain);
     const shop = await prisma.shop.findUnique({
       where: { domain: shopDomain },
     });
 
     if (!shop) {
+      console.error("Analytics API: Shop not found:", shopDomain);
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -65,6 +70,18 @@ export async function action({ request }: ActionFunctionArgs) {
     // Get user agent if not provided
     const clientUserAgent = userAgent || request.headers.get('user-agent') || 'unknown';
 
+    console.log("Analytics API: Creating analytics event with data:", {
+      shopId: shop.id,
+      popupId: popupId || null,
+      eventType,
+      sessionToken: sessionToken || null,
+      stepNumber: stepNumber || null,
+      metadata: metadata || null,
+      ipAddress: clientIP,
+      userAgent: clientUserAgent,
+      pageUrl: pageUrl || null
+    });
+
     // Create analytics event
     const analyticsEvent = await prisma.popupAnalytics.create({
       data: {
@@ -80,58 +97,49 @@ export async function action({ request }: ActionFunctionArgs) {
       }
     });
 
-    // Update customer analytics if we have a session token
+    console.log("Analytics API: Successfully created analytics event:", analyticsEvent.id);
+
+    // Update customer analytics if we have a session token - simplified version
     if (sessionToken) {
       const now = new Date();
       
-      // Find or create customer analytics record
-      await prisma.customerAnalytics.upsert({
-        where: { sessionToken },
-        create: {
-          shopId: shop.id,
-          sessionToken,
-          popupId: popupId || null,
-          customerJourney: [{
-            timestamp: now.toISOString(),
-            eventType,
-            stepNumber,
-            metadata
-          }],
-          conversionFunnel: {
-            [eventType]: 1
-          },
-          totalInteractions: 1,
-          firstVisit: now,
-          emailProvided: eventType === 'complete' || eventType === 'email_provided',
-          discountClaimed: eventType === 'discount_claimed'
-        },
-        update: {
-          customerJourney: {
-            push: {
-              timestamp: now.toISOString(),
-              eventType,
-              stepNumber,
-              metadata
-            }
-          },
-          conversionFunnel: {
-            // This will need custom logic to update funnel counts
-          },
-          totalInteractions: { increment: 1 },
-          emailProvided: eventType === 'complete' || eventType === 'email_provided' ? true : undefined,
-          discountClaimed: eventType === 'discount_claimed' ? true : undefined,
-          lastActivity: now
-        }
-      });
+      try {
+        // Find existing customer analytics record
+        const existing = await prisma.customerAnalytics.findUnique({
+          where: { sessionToken }
+        });
 
-      // Update funnel data with raw SQL for complex JSON updates
-      if (eventType !== 'impression') {
-        await prisma.$executeRaw`
-          UPDATE "CustomerAnalytics" 
-          SET "conversionFunnel" = COALESCE("conversionFunnel", '{}')::jsonb || 
-            jsonb_build_object(${eventType}, COALESCE(("conversionFunnel"->>${eventType})::int, 0) + 1)
-          WHERE "sessionToken" = ${sessionToken}
-        `;
+        if (existing) {
+          // Update existing record with simple operations
+          await prisma.customerAnalytics.update({
+            where: { sessionToken },
+            data: {
+              totalInteractions: { increment: 1 },
+              lastActivity: now,
+              emailProvided: eventType === 'complete' || eventType === 'email_provided' || existing.emailProvided,
+              discountClaimed: eventType === 'discount_claimed' || existing.discountClaimed
+            }
+          });
+        } else {
+          // Create new record with basic data
+          await prisma.customerAnalytics.create({
+            data: {
+              shopId: shop.id,
+              sessionToken,
+              popupId: popupId || null,
+              totalInteractions: 1,
+              firstVisit: now,
+              lastActivity: now,
+              emailProvided: eventType === 'complete' || eventType === 'email_provided',
+              discountClaimed: eventType === 'discount_claimed',
+              customerJourney: [],
+              conversionFunnel: {}
+            }
+          });
+        }
+      } catch (customerAnalyticsError) {
+        // Log customer analytics error but don't fail the main analytics tracking
+        console.warn("Customer analytics update failed:", customerAnalyticsError);
       }
     }
 
