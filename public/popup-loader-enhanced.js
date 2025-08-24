@@ -7,9 +7,26 @@
   }
   window.papaPopupLoaded = true;
 
-  const APP_URL = 'https://smartpop-revenue-engine.vercel.app';
+  // Dynamic app URL detection - try to get from script src or fall back to production
+  const getAppUrl = () => {
+    // Try to get from current script source
+    const scripts = document.getElementsByTagName('script');
+    for (let script of scripts) {
+      if (script.src && script.src.includes('popup-loader-enhanced.js')) {
+        const url = new URL(script.src);
+        return `${url.protocol}//${url.host}`;
+      }
+    }
+    
+    // Fallback to production URL
+    return 'https://smartpop-revenue-engine.vercel.app';
+  };
+  
+  const APP_URL = getAppUrl();
   const POPUP_SHOWN_KEY = 'papa_popup_shown';
   const SESSION_KEY = 'papa_popup_session';
+  
+  console.log('🔧 Papa Popup: Using APP_URL:', APP_URL);
   
   // Global state management
   let currentPopupState = {
@@ -21,7 +38,134 @@
     popup: null
   };
 
-  // Analytics tracking
+  // Analytics queue management
+  const ANALYTICS_QUEUE_KEY = 'papa_popup_analytics_queue';
+  const MAX_QUEUE_SIZE = 100;
+  const MAX_RETRY_ATTEMPTS = 3;
+
+  // Get analytics queue from localStorage
+  function getAnalyticsQueue() {
+    try {
+      const queue = localStorage.getItem(ANALYTICS_QUEUE_KEY);
+      return queue ? JSON.parse(queue) : [];
+    } catch (error) {
+      console.warn('📊 Papa Popup: Failed to read analytics queue:', error);
+      return [];
+    }
+  }
+
+  // Save analytics queue to localStorage
+  function saveAnalyticsQueue(queue) {
+    try {
+      // Limit queue size to prevent localStorage from growing too large
+      const limitedQueue = queue.slice(-MAX_QUEUE_SIZE);
+      localStorage.setItem(ANALYTICS_QUEUE_KEY, JSON.stringify(limitedQueue));
+    } catch (error) {
+      console.warn('📊 Papa Popup: Failed to save analytics queue:', error);
+    }
+  }
+
+  // Add event to analytics queue
+  function queueAnalyticsEvent(eventData) {
+    const queue = getAnalyticsQueue();
+    queue.push({
+      ...eventData,
+      timestamp: Date.now(),
+      attempts: 0,
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    });
+    saveAnalyticsQueue(queue);
+    console.log('📦 Papa Popup: Analytics event queued:', eventData.eventType);
+  }
+
+  // Process analytics queue with retry logic
+  async function processAnalyticsQueue() {
+    const queue = getAnalyticsQueue();
+    if (queue.length === 0) return;
+
+    console.log(`🔄 Papa Popup: Processing ${queue.length} queued analytics events`);
+
+    const processedItems = [];
+    
+    for (const item of queue) {
+      if (item.attempts >= MAX_RETRY_ATTEMPTS) {
+        console.warn('⚠️ Papa Popup: Max retry attempts reached for event:', item.eventType);
+        processedItems.push(item);
+        continue;
+      }
+
+      try {
+        const success = await sendAnalyticsEvent(item);
+        if (success) {
+          console.log('✅ Papa Popup: Queued event processed successfully:', item.eventType);
+          processedItems.push(item);
+        } else {
+          // Increment attempts and keep in queue for retry
+          item.attempts += 1;
+          item.lastAttempt = Date.now();
+          console.log(`🔄 Papa Popup: Event failed, will retry (attempt ${item.attempts}/${MAX_RETRY_ATTEMPTS}):`, item.eventType);
+        }
+      } catch (error) {
+        item.attempts += 1;
+        item.lastAttempt = Date.now();
+        console.error(`💥 Papa Popup: Queue processing failed for ${item.eventType}:`, error);
+      }
+    }
+
+    // Remove successfully processed items from queue
+    const remainingQueue = queue.filter(item => !processedItems.includes(item));
+    saveAnalyticsQueue(remainingQueue);
+
+    if (remainingQueue.length > 0) {
+      console.log(`📦 Papa Popup: ${remainingQueue.length} events remain in queue`);
+    }
+  }
+
+  // Send analytics event with multiple endpoints and retry logic
+  async function sendAnalyticsEvent(eventData) {
+    const endpoints = [
+      `${APP_URL}/api/analytics/proxy`,  // Proxy endpoint (primary)
+      `${APP_URL}/api/analytics/events`  // Direct endpoint (fallback)
+    ];
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`📊 Papa Popup: Attempting to send to ${endpoint}`);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(eventData),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+
+        console.log(`📊 Papa Popup: Response status from ${endpoint}:`, response.status);
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Papa Popup: Analytics event successfully sent via', endpoint);
+          console.log('📊 Papa Popup: Response data:', data);
+          return true;
+        } else {
+          const errorText = await response.text();
+          console.error(`❌ Papa Popup: ${endpoint} failed with status ${response.status}:`, errorText);
+        }
+      } catch (error) {
+        console.error(`💥 Papa Popup: ${endpoint} request failed:`, error);
+      }
+    }
+
+    return false; // All endpoints failed
+  }
+
+  // Enhanced analytics tracking with queue and retry
   function trackAnalyticsEvent(eventType, metadata = {}) {
     try {
       const eventData = {
@@ -37,33 +181,21 @@
 
       console.log('📊 Papa Popup: Preparing to track event:', eventType, eventData);
 
-      // Send to analytics API
-      fetch(`${APP_URL}/api/analytics/events`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(eventData)
-      })
-      .then(response => {
-        console.log('📊 Papa Popup: Analytics API response status:', response.status);
-        if (!response.ok) {
-          console.error('📊 Papa Popup: Analytics API failed with status:', response.status);
-          return response.text().then(text => {
-            console.error('📊 Papa Popup: Analytics API error response:', text);
-          });
-        } else {
-          console.log('✅ Papa Popup: Analytics event successfully sent:', eventType);
+      // Try to send immediately
+      sendAnalyticsEvent(eventData).then(success => {
+        if (!success) {
+          // If immediate send fails, queue for retry
+          console.log('📦 Papa Popup: Immediate send failed, queueing event:', eventType);
+          queueAnalyticsEvent(eventData);
         }
-        return response.json();
-      })
-      .then(data => {
-        if (data) {
-          console.log('📊 Papa Popup: Analytics API response data:', data);
-        }
-      })
-      .catch(error => {
-        console.error('💥 Papa Popup: Analytics tracking failed:', error);
+      }).catch(error => {
+        console.error('💥 Papa Popup: Analytics tracking failed, queueing event:', error);
+        queueAnalyticsEvent(eventData);
+      });
+
+      // Process any existing queued events
+      processAnalyticsQueue().catch(error => {
+        console.error('💥 Papa Popup: Queue processing failed:', error);
       });
       
       console.log('📊 Papa Popup: Event tracking initiated for:', eventType, metadata);
@@ -1083,7 +1215,15 @@
     checkPopupWithTrigger();
   };
 
+  // Periodic queue processing
+  setInterval(() => {
+    processAnalyticsQueue().catch(error => {
+      console.error('💥 Papa Popup: Periodic queue processing failed:', error);
+    });
+  }, 30000); // Process queue every 30 seconds
+
   window.debugPapaPopup = function() {
+    const analyticsQueue = getAnalyticsQueue();
     console.log('🔍 Papa Popup Debug Info:', {
       scriptLoaded: window.papaPopupLoaded,
       currentState: currentPopupState,
@@ -1097,7 +1237,30 @@
         pathname: window.location.pathname,
         pageType: getPageType()
       },
-      appUrl: APP_URL
+      appUrl: APP_URL,
+      analytics: {
+        queueLength: analyticsQueue.length,
+        queuedEvents: analyticsQueue.map(item => ({
+          eventType: item.eventType,
+          attempts: item.attempts,
+          timestamp: new Date(item.timestamp).toISOString()
+        }))
+      }
+    });
+  };
+
+  window.clearAnalyticsQueue = function() {
+    console.log('🧹 Papa Popup: Clearing analytics queue...');
+    localStorage.removeItem(ANALYTICS_QUEUE_KEY);
+    console.log('✅ Papa Popup: Analytics queue cleared!');
+  };
+
+  window.processAnalyticsQueue = function() {
+    console.log('🔄 Papa Popup: Manually processing analytics queue...');
+    processAnalyticsQueue().then(() => {
+      console.log('✅ Papa Popup: Queue processing completed!');
+    }).catch(error => {
+      console.error('💥 Papa Popup: Manual queue processing failed:', error);
     });
   };
 
@@ -1106,4 +1269,6 @@
   console.log('   - clearPapaPopup() - Clear session data');
   console.log('   - testPapaPopup() - Test popup immediately');  
   console.log('   - debugPapaPopup() - Show debug info');
+  console.log('   - clearAnalyticsQueue() - Clear analytics queue');
+  console.log('   - processAnalyticsQueue() - Process queued analytics');
 })();

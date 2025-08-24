@@ -3,11 +3,12 @@ import { json } from "@remix-run/node";
 import prisma from "../db.server";
 
 export async function action({ request }: ActionFunctionArgs) {
-  // Enable CORS for storefront
+  // Enhanced CORS headers for storefront
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+    "Access-Control-Max-Age": "86400", // 24 hours
     "Content-Type": "application/json",
   };
 
@@ -144,24 +145,47 @@ export async function action({ request }: ActionFunctionArgs) {
 
   } catch (error) {
     console.error("Analytics event error:", error);
+    
+    // Log detailed error information for debugging
+    console.error("Analytics error details:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      requestData: {
+        method: request.method,
+        url: request.url,
+        headers: Object.fromEntries(request.headers.entries())
+      }
+    });
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: "Failed to track event" 
+        error: "Failed to track event",
+        debug: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.message : String(error) : undefined
       }),
       { status: 500, headers: corsHeaders }
     );
   }
 }
 
-// Handle preflight
+// Handle preflight and health checks
 export async function loader() {
-  return new Response(null, {
-    status: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    },
-  });
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+    "Access-Control-Max-Age": "86400",
+    "Content-Type": "application/json",
+  };
+  
+  return new Response(
+    JSON.stringify({ 
+      status: "Analytics API is healthy",
+      timestamp: new Date().toISOString()
+    }), 
+    {
+      status: 200,
+      headers: corsHeaders,
+    }
+  );
 }
