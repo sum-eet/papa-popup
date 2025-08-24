@@ -209,7 +209,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
       }
     }
 
-    return redirect(`/app/popups`);
+    return {
+      success: true,
+      message: "Popup updated successfully!"
+    };
 
   } catch (error) {
     console.error("Popup update error:", error);
@@ -386,6 +389,12 @@ export default function EditPopup() {
           {actionData && !actionData.success && (
             <Banner tone="critical">
               <p>Error: {actionData.error}</p>
+            </Banner>
+          )}
+          
+          {actionData && actionData.success && (
+            <Banner tone="success" onDismiss={() => window.location.href = '/app/popups'}>
+              <p>{actionData.message}</p>
             </Banner>
           )}
 

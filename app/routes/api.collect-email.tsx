@@ -61,46 +61,12 @@ export async function action({ request }: ActionFunctionArgs) {
       source = "popup" 
     } = data;
 
-    // Enhanced validation
+    // Basic validation only - UI should handle detailed validation
     if (!email || !shopDomain) {
       return new Response(
         JSON.stringify({ 
           success: false, 
           error: "Email and shop domain are required" 
-        }),
-        { status: 400, headers: corsHeaders }
-      );
-    }
-    
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Invalid email format" 
-        }),
-        { status: 400, headers: corsHeaders }
-      );
-    }
-    
-    // Validate email length
-    if (email.length > 320) { // RFC 5321 limit
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Email address too long" 
-        }),
-        { status: 400, headers: corsHeaders }
-      );
-    }
-    
-    // Validate shop domain format
-    if (!/^[\w.-]+$/.test(shopDomain)) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Invalid shop domain format" 
         }),
         { status: 400, headers: corsHeaders }
       );

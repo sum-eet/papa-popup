@@ -26,7 +26,7 @@
     try {
       const eventData = {
         eventType,
-        shopDomain: window.Shopify?.shop || 'unknown',
+        shopDomain: window.Shopify?.shop || window.location.hostname,
         sessionToken: currentPopupState.sessionToken,
         popupId: currentPopupState.popup?.id,
         stepNumber: currentPopupState.currentStep,
@@ -35,6 +35,8 @@
         userAgent: navigator.userAgent
       };
 
+      console.log('📊 Papa Popup: Preparing to track event:', eventType, eventData);
+
       // Send to analytics API
       fetch(`${APP_URL}/api/analytics/events`, {
         method: 'POST',
@@ -42,13 +44,31 @@
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(eventData)
-      }).catch(error => {
-        console.warn('Papa Popup: Analytics tracking failed:', error);
+      })
+      .then(response => {
+        console.log('📊 Papa Popup: Analytics API response status:', response.status);
+        if (!response.ok) {
+          console.error('📊 Papa Popup: Analytics API failed with status:', response.status);
+          return response.text().then(text => {
+            console.error('📊 Papa Popup: Analytics API error response:', text);
+          });
+        } else {
+          console.log('✅ Papa Popup: Analytics event successfully sent:', eventType);
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data) {
+          console.log('📊 Papa Popup: Analytics API response data:', data);
+        }
+      })
+      .catch(error => {
+        console.error('💥 Papa Popup: Analytics tracking failed:', error);
       });
       
-      console.log('📊 Papa Popup: Tracked event:', eventType, metadata);
+      console.log('📊 Papa Popup: Event tracking initiated for:', eventType, metadata);
     } catch (error) {
-      console.warn('Papa Popup: Analytics error:', error);
+      console.error('💥 Papa Popup: Analytics error:', error);
     }
   }
 
@@ -194,16 +214,22 @@
 
     document.body.insertAdjacentHTML('beforeend', popupHTML);
     
+    console.log('📊 Papa Popup: Tracking impression event...');
     // Track impression and step view
     trackAnalyticsEvent('impression', {
       popupType: currentPopupState.popupType,
       totalSteps: currentPopupState.totalSteps,
-      pageType: getPageType()
+      pageType: getPageType(),
+      popupId: currentPopupState.popup?.id,
+      sessionToken: currentPopupState.sessionToken
     });
     
+    console.log('📊 Papa Popup: Tracking step view event...');
     trackAnalyticsEvent('step_view', {
       stepNumber: currentPopupState.currentStep,
-      stepType: currentStepData?.stepType
+      stepType: currentStepData?.stepType,
+      popupId: currentPopupState.popup?.id,
+      sessionToken: currentPopupState.sessionToken
     });
     
     setupMultiStepEvents();
@@ -372,30 +398,61 @@
     const closeBtn = document.getElementById('papa-popup-close');
 
     // Close popup function
-    function closePopup() {
+    function closePopup(reason = 'manual_close') {
+      console.log('🔴 Papa Popup: Closing popup - Reason:', reason);
+      
+      // Track close/dropoff event for multi-step popups
+      trackAnalyticsEvent('close', {
+        reason: reason,
+        stepNumber: currentPopupState.currentStep,
+        totalSteps: currentPopupState.totalSteps,
+        popupType: currentPopupState.popupType,
+        completionRate: Math.round((currentPopupState.currentStep / currentPopupState.totalSteps) * 100)
+      });
+      
+      // Track as dropoff if user didn't complete the flow
+      if (currentPopupState.currentStep < currentPopupState.totalSteps) {
+        trackAnalyticsEvent('dropoff', {
+          dropoffStage: `step_${currentPopupState.currentStep}`,
+          reason: reason,
+          completedSteps: currentPopupState.currentStep - 1,
+          remainingSteps: currentPopupState.totalSteps - currentPopupState.currentStep
+        });
+        console.log('📉 Papa Popup: Dropoff tracked at step', currentPopupState.currentStep);
+      }
+      
       if (overlay && overlay.parentNode) {
         overlay.remove();
       }
       sessionStorage.setItem(POPUP_SHOWN_KEY, 'true');
       localStorage.removeItem(SESSION_KEY);
-      console.log('Papa Popup: Closed');
+      console.log('✅ Papa Popup: Closed and cleaned up');
     }
 
     // Close on overlay click
     if (overlay) {
       overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) closePopup();
+        if (e.target === overlay) {
+          console.log('🖱️ Papa Popup: User clicked overlay to close');
+          closePopup('overlay_click');
+        }
       });
     }
 
     // Close on X button click
     if (closeBtn) {
-      closeBtn.addEventListener('click', closePopup);
+      closeBtn.addEventListener('click', () => {
+        console.log('❌ Papa Popup: User clicked X button to close');
+        closePopup('close_button');
+      });
     }
 
     // Close on Escape key
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closePopup();
+      if (e.key === 'Escape') {
+        console.log('⌨️ Papa Popup: User pressed Escape to close');
+        closePopup('escape_key');
+      }
     });
 
     // Setup step-specific events
@@ -434,6 +491,8 @@
     // Option selection
     options.forEach(option => {
       option.addEventListener('click', () => {
+        console.log('🔘 Papa Popup: User selected option:', option.textContent.trim());
+        
         // Remove selection from all options
         options.forEach(opt => opt.classList.remove('selected'));
         
@@ -445,17 +504,36 @@
           index: parseInt(option.dataset.index)
         };
         
+        // Track option selection
+        trackAnalyticsEvent('option_selected', {
+          stepNumber: currentPopupState.currentStep,
+          optionValue: selectedOption.value,
+          optionText: selectedOption.text,
+          optionIndex: selectedOption.index
+        });
+        
         // Enable next button
         if (nextBtn) {
           nextBtn.disabled = false;
         }
+        
+        console.log('✅ Papa Popup: Option selected and next button enabled');
       });
     });
 
     // Next button
     if (nextBtn) {
       nextBtn.addEventListener('click', async () => {
+        console.log('➡️ Papa Popup: User clicked Next button');
         if (selectedOption) {
+          console.log('📝 Papa Popup: Proceeding with selected option:', selectedOption);
+          
+          // Track step completion
+          trackAnalyticsEvent('step_complete', {
+            stepNumber: currentPopupState.currentStep,
+            response: selectedOption
+          });
+          
           await handleStepNavigation('next', selectedOption);
         }
       });
@@ -464,6 +542,14 @@
     // Back button
     if (backBtn) {
       backBtn.addEventListener('click', async () => {
+        console.log('⬅️ Papa Popup: User clicked Back button');
+        
+        // Track back navigation
+        trackAnalyticsEvent('step_back', {
+          fromStep: currentPopupState.currentStep,
+          toStep: currentPopupState.currentStep - 1
+        });
+        
         await handleStepNavigation('back');
       });
     }
@@ -479,11 +565,23 @@
     if (form) {
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        console.log('📧 Papa Popup: User submitted email form');
         
         if (!emailInput || !submitBtn) return;
 
         const email = emailInput.value.trim();
-        if (!email) return;
+        if (!email) {
+          console.log('⚠️ Papa Popup: Email input is empty');
+          return;
+        }
+
+        console.log('📧 Papa Popup: Processing email:', email);
+
+        // Track email submission attempt
+        trackAnalyticsEvent('email_attempt', {
+          stepNumber: currentPopupState.currentStep,
+          email: email
+        });
 
         // Show loading state
         const originalText = submitBtn.textContent;
@@ -493,13 +591,35 @@
         try {
           const success = await submitEmailWithSession(email);
           if (success) {
+            console.log('✅ Papa Popup: Email submission successful');
+            
+            // Track successful email submission
+            trackAnalyticsEvent('email_provided', {
+              stepNumber: currentPopupState.currentStep,
+              email: email
+            });
+            
+            // Track complete event
+            trackAnalyticsEvent('complete', {
+              popupType: currentPopupState.popupType,
+              totalSteps: currentPopupState.totalSteps,
+              email: email
+            });
+            
             showSuccessMessage();
-            setTimeout(closePopup, 3000);
+            setTimeout(() => closePopup('completed'), 3000);
           } else {
             throw new Error('Submission failed');
           }
         } catch (error) {
           console.error('💥 Papa Popup: Email submission failed:', error);
+          
+          // Track failed submission
+          trackAnalyticsEvent('email_failed', {
+            stepNumber: currentPopupState.currentStep,
+            error: error.message
+          });
+          
           submitBtn.textContent = originalText;
           submitBtn.disabled = false;
           alert('Sorry, there was an error. Please try again.');

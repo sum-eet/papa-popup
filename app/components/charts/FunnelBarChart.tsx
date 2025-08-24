@@ -4,12 +4,8 @@ import { Text } from '@shopify/polaris';
 interface FunnelData {
   impressions: number;
   clicks: number;
-  step1Views: number;
-  step2Views: number;
-  step3Views: number;
+  conversions: number;
   emailSubmissions: number;
-  clickRate: number;
-  conversionRate: number;
 }
 
 interface FunnelBarChartProps {
@@ -27,6 +23,10 @@ const SHOPIFY_COLORS = {
 };
 
 export function FunnelBarChart({ data }: FunnelBarChartProps) {
+  // Calculate rates
+  const clickRate = data.impressions > 0 ? Math.round((data.clicks / data.impressions) * 100) : 0;
+  const conversionRate = data.clicks > 0 ? Math.round((data.emailSubmissions / data.clicks) * 100) : 0;
+  
   // Prepare chart data - only include steps with data
   const chartData = [
     {
@@ -34,40 +34,24 @@ export function FunnelBarChart({ data }: FunnelBarChartProps) {
       value: data.impressions,
       color: SHOPIFY_COLORS.subdued,
       percentage: 100
-    },
-    {
-      name: 'Clicks',
-      value: data.clicks,
-      color: data.clickRate > 10 ? SHOPIFY_COLORS.success : data.clickRate > 5 ? SHOPIFY_COLORS.warning : SHOPIFY_COLORS.danger,
-      percentage: data.clickRate
     }
   ];
 
-  // Add step data only if it exists
-  if (data.step1Views > 0) {
+  if (data.clicks > 0) {
     chartData.push({
-      name: 'Step 1',
-      value: data.step1Views,
-      color: SHOPIFY_COLORS.primary,
-      percentage: data.impressions > 0 ? Math.round((data.step1Views / data.impressions) * 100) : 0
+      name: 'Clicks',
+      value: data.clicks,
+      color: clickRate > 10 ? SHOPIFY_COLORS.success : clickRate > 5 ? SHOPIFY_COLORS.warning : SHOPIFY_COLORS.danger,
+      percentage: clickRate
     });
   }
 
-  if (data.step2Views > 0) {
+  if (data.conversions > 0) {
     chartData.push({
-      name: 'Step 2',
-      value: data.step2Views,
+      name: 'Conversions',
+      value: data.conversions,
       color: SHOPIFY_COLORS.primary,
-      percentage: data.impressions > 0 ? Math.round((data.step2Views / data.impressions) * 100) : 0
-    });
-  }
-
-  if (data.step3Views > 0) {
-    chartData.push({
-      name: 'Step 3',
-      value: data.step3Views,
-      color: SHOPIFY_COLORS.primary,
-      percentage: data.impressions > 0 ? Math.round((data.step3Views / data.impressions) * 100) : 0
+      percentage: data.impressions > 0 ? Math.round((data.conversions / data.impressions) * 100) : 0
     });
   }
 
@@ -78,6 +62,25 @@ export function FunnelBarChart({ data }: FunnelBarChartProps) {
       color: SHOPIFY_COLORS.success,
       percentage: data.impressions > 0 ? Math.round((data.emailSubmissions / data.impressions) * 100) : 0
     });
+  }
+
+  // If no meaningful data, show empty state
+  if (data.impressions === 0) {
+    return (
+      <div style={{ 
+        textAlign: 'center', 
+        padding: '40px',
+        backgroundColor: SHOPIFY_COLORS.background,
+        borderRadius: '8px'
+      }}>
+        <Text variant="bodyMd" as="p" tone="subdued">
+          No funnel data available yet
+        </Text>
+        <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '4px' }}>
+          Activate your popups to start collecting analytics
+        </Text>
+      </div>
+    );
   }
 
   // Custom tooltip with Shopify styling
@@ -171,8 +174,8 @@ export function FunnelBarChart({ data }: FunnelBarChartProps) {
         <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '4px' }}>
           {data.impressions > 0 ? (
             <>
-              Overall conversion rate: <strong>{data.conversionRate}%</strong>
-              {' • '}Click-through rate: <strong>{data.clickRate}%</strong>
+              Overall conversion rate: <strong>{conversionRate}%</strong>
+              {' • '}Click-through rate: <strong>{clickRate}%</strong>
               {data.emailSubmissions > 0 && (
                 <>
                   {' • '}Email capture: <strong>{Math.round((data.emailSubmissions / data.impressions) * 100)}%</strong>
