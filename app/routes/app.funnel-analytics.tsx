@@ -13,6 +13,9 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { isMultiPopupEnabled } from "../utils/features";
 import { redirect } from "@remix-run/node";
+import { FunnelBarChart } from "../components/charts/FunnelBarChart";
+import { DropoffBarChart } from "../components/charts/DropoffBarChart";
+import { ConversionLineChart } from "../components/charts/ConversionLineChart";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Check if analytics are available (only in multi-popup mode)
@@ -294,220 +297,55 @@ export default function FunnelAnalytics() {
           </Card>
         </Layout.Section>
 
-        {/* Multi-Step Funnel Visualization */}
+        {/* Professional Funnel Bar Chart */}
         <Layout.Section>
           <Card>
             <div style={{ padding: '20px' }}>
-              <Text variant="headingMd" as="h2">Multi-Step Conversion Funnel</Text>
+              <Text variant="headingMd" as="h2">Conversion Funnel Chart</Text>
               <Text variant="bodyMd" as="p" tone="subdued" style={{ marginTop: '8px' }}>
-                Track user progression through each step of your popups
+                Visual breakdown of user progression through your funnel stages
               </Text>
               
-              <div style={{ marginTop: '24px' }}>
-                {/* Funnel Steps */}
-                <div style={{ display: 'grid', gap: '16px' }}>
-                  {/* Impressions → Clicks */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <Text variant="bodyMd" as="p" fontWeight="semibold">👁️ Impressions → 🖱️ Clicks</Text>
-                        <Text variant="bodyMd" as="p">{funnelData.impressions.toLocaleString()} → {funnelData.clicks.toLocaleString()}</Text>
-                      </div>
-                      <div style={{ height: '8px', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div style={{ 
-                          height: '100%', 
-                          backgroundColor: funnelData.clickRate > 10 ? '#00AA5B' : funnelData.clickRate > 5 ? '#FFA500' : '#E53E3E',
-                          width: `${Math.min(funnelData.clickRate, 100)}%`,
-                          borderRadius: '4px'
-                        }}></div>
-                      </div>
-                      <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '4px' }}>
-                        {funnelData.clickRate}% click through rate
-                      </Text>
-                    </div>
-                  </div>
-
-                  {/* Step 1 Views/Completions */}
-                  {funnelData.step1Views > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingLeft: '20px' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <Text variant="bodyMd" as="p" fontWeight="semibold">📝 Step 1 Views → Completions</Text>
-                          <Text variant="bodyMd" as="p">{funnelData.step1Views.toLocaleString()} → {funnelData.step1Completions.toLocaleString()}</Text>
-                        </div>
-                        <div style={{ height: '8px', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                          <div style={{ 
-                            height: '100%', 
-                            backgroundColor: '#007cba',
-                            width: `${funnelData.step1Views > 0 ? Math.min((funnelData.step1Completions / funnelData.step1Views) * 100, 100) : 0}%`,
-                            borderRadius: '4px'
-                          }}></div>
-                        </div>
-                        <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '4px' }}>
-                          {funnelData.step1Views > 0 ? Math.round((funnelData.step1Completions / funnelData.step1Views) * 100) : 0}% completion rate
-                        </Text>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Step 2 Views/Completions */}
-                  {funnelData.step2Views > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingLeft: '40px' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <Text variant="bodyMd" as="p" fontWeight="semibold">📋 Step 2 Views → Completions</Text>
-                          <Text variant="bodyMd" as="p">{funnelData.step2Views.toLocaleString()} → {funnelData.step2Completions.toLocaleString()}</Text>
-                        </div>
-                        <div style={{ height: '8px', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                          <div style={{ 
-                            height: '100%', 
-                            backgroundColor: '#007cba',
-                            width: `${funnelData.step2Views > 0 ? Math.min((funnelData.step2Completions / funnelData.step2Views) * 100, 100) : 0}%`,
-                            borderRadius: '4px'
-                          }}></div>
-                        </div>
-                        <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '4px' }}>
-                          {funnelData.step2Views > 0 ? Math.round((funnelData.step2Completions / funnelData.step2Views) * 100) : 0}% completion rate
-                        </Text>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Step 3 Views/Completions */}
-                  {funnelData.step3Views > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingLeft: '60px' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <Text variant="bodyMd" as="p" fontWeight="semibold">📊 Step 3 Views → Completions</Text>
-                          <Text variant="bodyMd" as="p">{funnelData.step3Views.toLocaleString()} → {funnelData.step3Completions.toLocaleString()}</Text>
-                        </div>
-                        <div style={{ height: '8px', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                          <div style={{ 
-                            height: '100%', 
-                            backgroundColor: '#007cba',
-                            width: `${funnelData.step3Views > 0 ? Math.min((funnelData.step3Completions / funnelData.step3Views) * 100, 100) : 0}%`,
-                            borderRadius: '4px'
-                          }}></div>
-                        </div>
-                        <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '4px' }}>
-                          {funnelData.step3Views > 0 ? Math.round((funnelData.step3Completions / funnelData.step3Views) * 100) : 0}% completion rate
-                        </Text>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Email Submissions */}
-                  {funnelData.emailSubmissions > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingLeft: '80px' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <Text variant="bodyMd" as="p" fontWeight="semibold">📧 Email Submissions</Text>
-                          <Text variant="bodyMd" as="p">{funnelData.emailSubmissions.toLocaleString()}</Text>
-                        </div>
-                        <div style={{ height: '8px', backgroundColor: '#00AA5B', borderRadius: '4px' }}></div>
-                        <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '4px' }}>
-                          Final conversion achieved
-                        </Text>
-                      </div>
-                    </div>
-                  )}
-                </div>
+              <div style={{ marginTop: '20px' }}>
+                <FunnelBarChart data={funnelData} />
               </div>
             </div>
           </Card>
         </Layout.Section>
 
-        {/* Dropoff Analysis */}
+        {/* Conversion Trends Chart */}
         <Layout.Section>
           <Card>
             <div style={{ padding: '20px' }}>
-              <Text variant="headingMd" as="h2">Drop-off Analysis</Text>
+              <Text variant="headingMd" as="h2">Conversion Trends</Text>
+              <Text variant="bodyMd" as="p" tone="subdued" style={{ marginTop: '8px' }}>
+                Track performance trends over time (sample data shown)
+              </Text>
+              
+              <div style={{ marginTop: '20px' }}>
+                <ConversionLineChart data={[]} />
+              </div>
+            </div>
+          </Card>
+        </Layout.Section>
+
+        {/* Professional Dropoff Chart */}
+        <Layout.Section>
+          <Card>
+            <div style={{ padding: '20px' }}>
+              <Text variant="headingMd" as="h2">Drop-off Analysis Chart</Text>
               <Text variant="bodyMd" as="p" tone="subdued" style={{ marginTop: '8px' }}>
                 Identify where users are leaving your funnel most frequently
               </Text>
               
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px', marginTop: '20px' }}>
-                {/* Click to Step 1 Dropoff */}
-                {funnelData.clickToStep1Dropoff > 0 && (
-                  <div style={{ 
-                    padding: '16px', 
-                    backgroundColor: '#fef7f0', 
-                    borderRadius: '8px',
-                    borderLeft: `4px solid ${funnelData.clickToStep1Dropoff > 50 ? '#E53E3E' : funnelData.clickToStep1Dropoff > 25 ? '#FFA500' : '#00AA5B'}`
-                  }}>
-                    <Text variant="bodyMd" as="p" fontWeight="semibold">Click → Step 1</Text>
-                    <Text variant="headingLg" as="p" style={{color: funnelData.clickToStep1Dropoff > 50 ? '#E53E3E' : funnelData.clickToStep1Dropoff > 25 ? '#FFA500' : '#00AA5B'}}>
-                      {funnelData.clickToStep1Dropoff}% drop-off
-                    </Text>
-                    <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '4px' }}>
-                      Users who click but don't start Step 1
-                    </Text>
-                  </div>
-                )}
-
-                {/* Step 1 to Step 2 Dropoff */}
-                {funnelData.step1ToStep2Dropoff > 0 && (
-                  <div style={{ 
-                    padding: '16px', 
-                    backgroundColor: '#fef7f0', 
-                    borderRadius: '8px',
-                    borderLeft: `4px solid ${funnelData.step1ToStep2Dropoff > 50 ? '#E53E3E' : funnelData.step1ToStep2Dropoff > 25 ? '#FFA500' : '#00AA5B'}`
-                  }}>
-                    <Text variant="bodyMd" as="p" fontWeight="semibold">Step 1 → Step 2</Text>
-                    <Text variant="headingLg" as="p" style={{color: funnelData.step1ToStep2Dropoff > 50 ? '#E53E3E' : funnelData.step1ToStep2Dropoff > 25 ? '#FFA500' : '#00AA5B'}}>
-                      {funnelData.step1ToStep2Dropoff}% drop-off
-                    </Text>
-                    <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '4px' }}>
-                      Users who abandon after Step 1
-                    </Text>
-                  </div>
-                )}
-
-                {/* Step 2 to Step 3 Dropoff */}
-                {funnelData.step2ToStep3Dropoff > 0 && (
-                  <div style={{ 
-                    padding: '16px', 
-                    backgroundColor: '#fef7f0', 
-                    borderRadius: '8px',
-                    borderLeft: `4px solid ${funnelData.step2ToStep3Dropoff > 50 ? '#E53E3E' : funnelData.step2ToStep3Dropoff > 25 ? '#FFA500' : '#00AA5B'}`
-                  }}>
-                    <Text variant="bodyMd" as="p" fontWeight="semibold">Step 2 → Step 3</Text>
-                    <Text variant="headingLg" as="p" style={{color: funnelData.step2ToStep3Dropoff > 50 ? '#E53E3E' : funnelData.step2ToStep3Dropoff > 25 ? '#FFA500' : '#00AA5B'}}>
-                      {funnelData.step2ToStep3Dropoff}% drop-off
-                    </Text>
-                    <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '4px' }}>
-                      Users who leave during Step 2
-                    </Text>
-                  </div>
-                )}
-
-                {/* Step 3 to Email Dropoff */}
-                {funnelData.step3ToEmailDropoff > 0 && (
-                  <div style={{ 
-                    padding: '16px', 
-                    backgroundColor: '#fef7f0', 
-                    borderRadius: '8px',
-                    borderLeft: `4px solid ${funnelData.step3ToEmailDropoff > 50 ? '#E53E3E' : funnelData.step3ToEmailDropoff > 25 ? '#FFA500' : '#00AA5B'}`
-                  }}>
-                    <Text variant="bodyMd" as="p" fontWeight="semibold">Step 3 → Email</Text>
-                    <Text variant="headingLg" as="p" style={{color: funnelData.step3ToEmailDropoff > 50 ? '#E53E3E' : funnelData.step3ToEmailDropoff > 25 ? '#FFA500' : '#00AA5B'}}>
-                      {funnelData.step3ToEmailDropoff}% drop-off
-                    </Text>
-                    <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '4px' }}>
-                      Users who complete steps but don't provide email
-                    </Text>
-                  </div>
-                )}
+              <div style={{ marginTop: '20px' }}>
+                <DropoffBarChart data={{
+                  clickToStep1Dropoff: funnelData.clickToStep1Dropoff,
+                  step1ToStep2Dropoff: funnelData.step1ToStep2Dropoff,
+                  step2ToStep3Dropoff: funnelData.step2ToStep3Dropoff,
+                  step3ToEmailDropoff: funnelData.step3ToEmailDropoff
+                }} />
               </div>
-
-              {/* No data message */}
-              {funnelData.impressions === 0 && (
-                <div style={{ textAlign: 'center', marginTop: '20px', padding: '20px' }}>
-                  <Text variant="bodyMd" as="p" tone="subdued">
-                    No funnel data available yet. Activate your popups to start collecting analytics.
-                  </Text>
-                </div>
-              )}
             </div>
           </Card>
         </Layout.Section>
