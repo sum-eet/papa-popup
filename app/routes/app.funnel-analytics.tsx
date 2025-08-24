@@ -13,9 +13,10 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { isMultiPopupEnabled } from "../utils/features";
 import { redirect } from "@remix-run/node";
-import { FunnelBarChart } from "../components/charts/FunnelBarChart";
-import { DropoffBarChart } from "../components/charts/DropoffBarChart";
-import { ConversionLineChart } from "../components/charts/ConversionLineChart";
+// Temporarily commented out to fix React error #185
+// import { FunnelBarChart } from "../components/charts/FunnelBarChart";
+// import { DropoffBarChart } from "../components/charts/DropoffBarChart";
+// import { ConversionLineChart } from "../components/charts/ConversionLineChart";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Check if analytics are available (only in multi-popup mode)
@@ -306,8 +307,21 @@ export default function FunnelAnalytics() {
                 Visual breakdown of user progression through your funnel stages
               </Text>
               
-              <div style={{ marginTop: '20px' }}>
-                <FunnelBarChart data={funnelData} />
+              {/* Temporary placeholder while fixing React conflicts */}
+              <div style={{ 
+                marginTop: '20px', 
+                padding: '40px', 
+                backgroundColor: '#f6f6f7', 
+                borderRadius: '8px', 
+                textAlign: 'center',
+                border: '2px dashed #d1d5da'
+              }}>
+                <Text variant="bodyMd" as="p" fontWeight="semibold">Professional Chart Coming Soon</Text>
+                <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '8px' }}>
+                  Impressions: {funnelData.impressions.toLocaleString()} • 
+                  Clicks: {funnelData.clicks.toLocaleString()} ({funnelData.clickRate}%) • 
+                  Emails: {funnelData.emailSubmissions.toLocaleString()}
+                </Text>
               </div>
             </div>
           </Card>
@@ -322,8 +336,21 @@ export default function FunnelAnalytics() {
                 Track performance trends over time (sample data shown)
               </Text>
               
-              <div style={{ marginTop: '20px' }}>
-                <ConversionLineChart data={[]} />
+              {/* Temporary placeholder while fixing React conflicts */}
+              <div style={{ 
+                marginTop: '20px', 
+                padding: '40px', 
+                backgroundColor: '#f6f6f7', 
+                borderRadius: '8px', 
+                textAlign: 'center',
+                border: '2px dashed #d1d5da'
+              }}>
+                <Text variant="bodyMd" as="p" fontWeight="semibold">Line Chart Coming Soon</Text>
+                <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '8px' }}>
+                  Click Rate: {funnelData.clickRate}% • 
+                  Conversion Rate: {funnelData.conversionRate}% • 
+                  Trends over time
+                </Text>
               </div>
             </div>
           </Card>
@@ -338,13 +365,22 @@ export default function FunnelAnalytics() {
                 Identify where users are leaving your funnel most frequently
               </Text>
               
-              <div style={{ marginTop: '20px' }}>
-                <DropoffBarChart data={{
-                  clickToStep1Dropoff: funnelData.clickToStep1Dropoff,
-                  step1ToStep2Dropoff: funnelData.step1ToStep2Dropoff,
-                  step2ToStep3Dropoff: funnelData.step2ToStep3Dropoff,
-                  step3ToEmailDropoff: funnelData.step3ToEmailDropoff
-                }} />
+              {/* Temporary placeholder while fixing React conflicts */}
+              <div style={{ 
+                marginTop: '20px', 
+                padding: '40px', 
+                backgroundColor: '#f6f6f7', 
+                borderRadius: '8px', 
+                textAlign: 'center',
+                border: '2px dashed #d1d5da'
+              }}>
+                <Text variant="bodyMd" as="p" fontWeight="semibold">Dropoff Chart Coming Soon</Text>
+                <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '8px' }}>
+                  {funnelData.clickToStep1Dropoff > 0 && `Click→Step1: ${funnelData.clickToStep1Dropoff}% • `}
+                  {funnelData.step1ToStep2Dropoff > 0 && `Step1→Step2: ${funnelData.step1ToStep2Dropoff}% • `}
+                  {funnelData.step2ToStep3Dropoff > 0 && `Step2→Step3: ${funnelData.step2ToStep3Dropoff}%`}
+                  {funnelData.clickToStep1Dropoff === 0 && funnelData.step1ToStep2Dropoff === 0 && 'No dropoff data yet'}
+                </Text>
               </div>
             </div>
           </Card>
