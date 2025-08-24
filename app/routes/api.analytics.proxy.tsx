@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { action as analyticsAction } from "./api.analytics.events";
 
 // This proxy route allows analytics to be sent from any domain without CORS issues
 // It forwards the analytics data to our main analytics system
@@ -24,10 +25,8 @@ export async function action({ request }: ActionFunctionArgs) {
     
     console.log("Analytics Proxy: Received data:", analyticsData);
 
-    // Forward to the main analytics API using an internal request
-    const analyticsUrl = new URL("/api/analytics/events", request.url);
-    
-    const forwardResponse = await fetch(analyticsUrl.toString(), {
+    // Create a new request object with the analytics data
+    const forwardRequest = new Request(request.url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -35,10 +34,18 @@ export async function action({ request }: ActionFunctionArgs) {
       body: JSON.stringify(analyticsData),
     });
 
-    const responseData = await forwardResponse.json();
+    // Call the analytics action directly instead of making HTTP request
+    const response = await analyticsAction({ 
+      request: forwardRequest,
+      context: {},
+      params: {}
+    });
     
-    if (forwardResponse.ok) {
-      console.log("Analytics Proxy: Successfully forwarded to main API");
+    // Check if response is successful
+    if (response.status >= 200 && response.status < 300) {
+      console.log("Analytics Proxy: Successfully processed via direct call");
+      const responseData = await response.json();
+      
       return new Response(
         JSON.stringify({
           success: true,
@@ -48,25 +55,41 @@ export async function action({ request }: ActionFunctionArgs) {
         { status: 200, headers: corsHeaders }
       );
     } else {
-      console.error("Analytics Proxy: Main API failed:", responseData);
+      console.error("Analytics Proxy: Direct call failed with status:", response.status);
+      const errorData = await response.text();
+      
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Analytics API failed",
-          details: responseData
+          error: "Analytics processing failed",
+          details: errorData,
+          status: response.status
         }),
-        { status: forwardResponse.status, headers: corsHeaders }
+        { status: response.status, headers: corsHeaders }
       );
     }
 
   } catch (error) {
     console.error("Analytics Proxy error:", error);
     
+    // Log detailed error information
+    console.error("Analytics Proxy detailed error:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      type: typeof error,
+      requestUrl: request.url,
+      requestMethod: request.method
+    });
+    
     return new Response(
       JSON.stringify({
         success: false,
         error: "Proxy failed to process analytics",
-        debug: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.message : String(error) : undefined
+        debug: {
+          message: error instanceof Error ? error.message : String(error),
+          stack: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined,
+          type: typeof error
+        }
       }),
       { status: 500, headers: corsHeaders }
     );
