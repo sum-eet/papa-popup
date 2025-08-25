@@ -23,7 +23,7 @@ import {
 import { useState, useEffect } from "react";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { admin, session } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const { id } = params;
 
   if (!id) {

@@ -1,6 +1,6 @@
 import { type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, Form, useNavigation, useActionData, redirect } from "@remix-run/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Page,
   Layout,
@@ -253,21 +253,21 @@ export default function EditPopup() {
   const existingSpecificUrls = (targetingRules.specificUrls || []).join('\n');
 
   // Get existing step data for form pre-population
-  const getStepContent = (stepNumber: number, field: string) => {
+  const getStepContent = useCallback((stepNumber: number, field: string) => {
     const step = popup.steps.find(s => s.stepNumber === stepNumber);
     if (!step) return '';
     
     const content = typeof step.content === 'string' ? JSON.parse(step.content) : step.content;
     return content[field] || '';
-  };
+  }, [popup.steps]);
 
-  const getStepOption = (stepNumber: number, optionIndex: number) => {
+  const getStepOption = useCallback((stepNumber: number, optionIndex: number) => {
     const step = popup.steps.find(s => s.stepNumber === stepNumber);
     if (!step) return '';
     
     const content = typeof step.content === 'string' ? JSON.parse(step.content) : step.content;
     return content.options?.[optionIndex]?.text || '';
-  };
+  }, [popup.steps]);
 
   const [popupType, setPopupType] = useState<PopupType>(popup.popupType as PopupType);
   const [totalSteps, setTotalSteps] = useState(popup.totalSteps);
