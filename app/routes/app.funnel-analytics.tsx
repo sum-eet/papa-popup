@@ -1,5 +1,5 @@
 import { type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useNavigate, useSearchParams } from "@remix-run/react";
+import { useLoaderData, useNavigate } from "@remix-run/react";
 import { useCallback, useMemo } from "react";
 import { 
   Page, 
@@ -15,10 +15,9 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { isMultiPopupEnabled } from "../utils/features";
 import { redirect } from "@remix-run/node";
-import { FunnelBarChart } from "../components/charts/FunnelBarChart";
-import { DropoffBarChart } from "../components/charts/DropoffBarChart";
+import { SimpleFunnel } from "../components/charts/SimpleFunnel";
+import { SimpleDropoffChart } from "../components/charts/SimpleDropoffChart";
 import { ErrorBoundary } from "../components/ErrorBoundary";
-import { ConversionLineChart } from "../components/charts/ConversionLineChart";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Check if analytics are available (only in multi-popup mode)
@@ -78,16 +77,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   try {
     // Get funnel metrics from CustomerSession table using our corrected tracking fields
-    const sessionsData = await prisma.customerSession.groupBy({
-      by: ['id'],
-      where: {
-        shopId: shop.id,
-        ...popupFilter
-      },
-      _count: {
-        id: true
-      }
-    });
 
     // Get detailed funnel breakdown
     const funnelMetrics = await prisma.customerSession.findMany({
@@ -155,9 +144,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function FunnelAnalytics() {
-  const { shop, stats, funnelData, recentEmails, selectedPopupId, popups } = useLoaderData<typeof loader>();
+  const { stats, funnelData, recentEmails, selectedPopupId, popups } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   
 
   // Memoize chart data objects to prevent recreation and infinite re-renders
@@ -187,7 +175,6 @@ export default function FunnelAnalytics() {
     funnelData.emailDropoff
   ]);
 
-  const conversionChartData = useMemo(() => ([]), []);
 
   // Handle popup filter change - wrapped in useCallback to prevent infinite re-renders
   const handlePopupFilterChange = useCallback((value: string) => {
@@ -343,26 +330,10 @@ export default function FunnelAnalytics() {
               </Text>
               
               <div style={{ marginTop: '20px' }}>
-                <FunnelBarChart 
+                <SimpleFunnel 
                   key="funnel-chart" 
                   data={funnelChartData}
                 />
-              </div>
-            </div>
-          </Card>
-        </Layout.Section>
-
-        {/* Conversion Trends Chart */}
-        <Layout.Section>
-          <Card>
-            <div style={{ padding: '20px' }}>
-              <Text variant="headingMd" as="h2">Conversion Trends</Text>
-              <Text variant="bodyMd" as="p" tone="subdued" style={{ marginTop: '8px' }}>
-                Track performance trends over time (sample data shown)
-              </Text>
-              
-              <div style={{ marginTop: '20px' }}>
-                <ConversionLineChart data={conversionChartData} />
               </div>
             </div>
           </Card>
@@ -378,7 +349,7 @@ export default function FunnelAnalytics() {
               </Text>
               
               <div style={{ marginTop: '20px' }}>
-                <DropoffBarChart 
+                <SimpleDropoffChart 
                   key="dropoff-chart" 
                   data={dropoffChartData}
                 />
