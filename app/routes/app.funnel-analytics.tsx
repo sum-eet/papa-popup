@@ -17,6 +17,7 @@ import { isMultiPopupEnabled } from "../utils/features";
 import { redirect } from "@remix-run/node";
 import { FunnelBarChart } from "../components/charts/FunnelBarChart";
 import { DropoffBarChart } from "../components/charts/DropoffBarChart";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ConversionLineChart } from "../components/charts/ConversionLineChart";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -213,15 +214,16 @@ export default function FunnelAnalytics() {
   ]), [recentEmails]);
 
   return (
-    <Page
-      title="Funnel Analytics"
-      subtitle="Basic funnel insights for your popup campaigns"
-      backAction={{
-        content: 'Dashboard',
-        url: '/app'
-      }}
-    >
-      <Layout>
+    <ErrorBoundary>
+      <Page
+        title="Funnel Analytics"
+        subtitle="Basic funnel insights for your popup campaigns"
+        backAction={{
+          content: 'Dashboard',
+          url: '/app'
+        }}
+      >
+        <Layout>
         {/* Popup Filter */}
         <Layout.Section>
           <Card>
@@ -397,5 +399,6 @@ export default function FunnelAnalytics() {
         </Layout.Section>
       </Layout>
     </Page>
+    </ErrorBoundary>
   );
 }
