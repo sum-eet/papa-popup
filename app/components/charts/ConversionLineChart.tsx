@@ -1,3 +1,4 @@
+import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Text } from '@shopify/polaris';
 
@@ -23,7 +24,7 @@ const SHOPIFY_COLORS = {
   background: '#f6f6f7'
 };
 
-export function ConversionLineChart({ data, title = "Conversion Trends" }: ConversionLineChartProps) {
+export const ConversionLineChart = React.memo(({ data, title = "Conversion Trends" }: ConversionLineChartProps) => {
   // If no data, show placeholder with sample data or empty state
   if (!data || data.length === 0) {
     // Create sample data for demonstration
@@ -186,4 +187,4 @@ export function ConversionLineChart({ data, title = "Conversion Trends" }: Conve
       </div>
     </div>
   );
-}
+});

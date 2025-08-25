@@ -1,3 +1,4 @@
+import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Text } from '@shopify/polaris';
 
@@ -22,7 +23,7 @@ const SHOPIFY_COLORS = {
   background: '#f6f6f7'
 };
 
-export function DropoffBarChart({ data }: DropoffBarChartProps) {
+export const DropoffBarChart = React.memo(({ data }: DropoffBarChartProps) => {
   // Prepare chart data - show all dropoff stages
   const chartData = [];
 
@@ -193,4 +194,4 @@ export function DropoffBarChart({ data }: DropoffBarChartProps) {
       </div>
     </div>
   );
-}
+});

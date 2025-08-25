@@ -327,13 +327,16 @@ export default function FunnelAnalytics() {
               </Text>
               
               <div style={{ marginTop: '20px' }}>
-                <FunnelBarChart data={{
-                  impressions: stableFunnelData.impressions,
-                  step1Completions: stableFunnelData.step1Completions,
-                  step2Completions: stableFunnelData.step2Completions,
-                  step3Completions: stableFunnelData.step3Completions,
-                  emailCompletions: stableFunnelData.emailCompletions
-                }} />
+                <FunnelBarChart 
+                  key="funnel-chart" 
+                  data={{
+                    impressions: stableFunnelData.impressions,
+                    step1Completions: stableFunnelData.step1Completions,
+                    step2Completions: stableFunnelData.step2Completions,
+                    step3Completions: stableFunnelData.step3Completions,
+                    emailCompletions: stableFunnelData.emailCompletions
+                  }} 
+                />
               </div>
             </div>
           </Card>
@@ -365,12 +368,15 @@ export default function FunnelAnalytics() {
               </Text>
               
               <div style={{ marginTop: '20px' }}>
-                <DropoffBarChart data={{
-                  step1Dropoff: stableFunnelData.step1Dropoff,
-                  step2Dropoff: stableFunnelData.step2Dropoff,
-                  step3Dropoff: stableFunnelData.step3Dropoff,
-                  emailDropoff: stableFunnelData.emailDropoff
-                }} />
+                <DropoffBarChart 
+                  key="dropoff-chart" 
+                  data={{
+                    step1Dropoff: stableFunnelData.step1Dropoff,
+                    step2Dropoff: stableFunnelData.step2Dropoff,
+                    step3Dropoff: stableFunnelData.step3Dropoff,
+                    emailDropoff: stableFunnelData.emailDropoff
+                  }} 
+                />
               </div>
             </div>
           </Card>

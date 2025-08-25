@@ -1,3 +1,4 @@
+import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Text } from '@shopify/polaris';
 
@@ -23,7 +24,7 @@ const SHOPIFY_COLORS = {
   background: '#f6f6f7'
 };
 
-export function FunnelBarChart({ data }: FunnelBarChartProps) {
+export const FunnelBarChart = React.memo(({ data }: FunnelBarChartProps) => {
   // Calculate rates
   const step1Rate = data.impressions > 0 ? Math.round((data.step1Completions / data.impressions) * 100) : 0;
   const step2Rate = data.step1Completions > 0 ? Math.round((data.step2Completions / data.step1Completions) * 100) : 0;
@@ -202,4 +203,4 @@ export function FunnelBarChart({ data }: FunnelBarChartProps) {
       </div>
     </div>
   );
-}
+});

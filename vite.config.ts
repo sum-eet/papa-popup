@@ -38,9 +38,6 @@ if (host === "localhost") {
 }
 
 export default defineConfig({
-  define: {
-    'process.env.NODE_ENV': '"development"'
-  },
   server: {
     allowedHosts: [host],
     cors: {
@@ -69,7 +66,6 @@ export default defineConfig({
   ],
   build: {
     assetsInlineLimit: 0,
-    minify: false, // Disable minification to get readable error messages
   },
   optimizeDeps: {
     include: ["@shopify/app-bridge-react", "@shopify/polaris"],
