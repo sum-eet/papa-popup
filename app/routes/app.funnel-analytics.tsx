@@ -157,6 +157,20 @@ export default function FunnelAnalytics() {
   const { shop, stats, funnelData, recentEmails, selectedPopupId, popups } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  
+  // Memoize all loader data to prevent recreation on every render
+  const stableFunnelData = useMemo(() => funnelData, [
+    funnelData.impressions,
+    funnelData.step1Completions,
+    funnelData.step2Completions,
+    funnelData.step3Completions,
+    funnelData.emailCompletions,
+    funnelData.step1Dropoff,
+    funnelData.step2Dropoff,
+    funnelData.step3Dropoff,
+    funnelData.emailDropoff,
+    funnelData.overallConversionRate
+  ]);
 
   // Handle popup filter change - wrapped in useCallback to prevent infinite re-renders
   const handlePopupFilterChange = useCallback((value: string) => {
@@ -165,15 +179,16 @@ export default function FunnelAnalytics() {
       return;
     }
     
-    const newSearchParams = new URLSearchParams(searchParams);
+    const currentParams = new URLSearchParams(window.location.search);
     if (value === 'all') {
-      newSearchParams.delete('popup');
+      currentParams.delete('popup');
     } else {
-      newSearchParams.set('popup', value);
+      currentParams.set('popup', value);
     }
     
-    navigate(`/app/funnel-analytics?${newSearchParams.toString()}`);
-  }, [selectedPopupId, searchParams, navigate]);
+    const newUrl = `/app/funnel-analytics${currentParams.toString() ? '?' + currentParams.toString() : ''}`;
+    navigate(newUrl);
+  }, [selectedPopupId, navigate]);
 
   // Prepare popup filter options - memoized to prevent recreation on every render
   const popupOptions = useMemo(() => [
@@ -228,40 +243,40 @@ export default function FunnelAnalytics() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
             <Card>
               <div style={{ padding: '20px', textAlign: 'center' }}>
-                <Text variant="headingXl" as="p">{funnelData.impressions.toLocaleString()}</Text>
+                <Text variant="headingXl" as="p">{stableFunnelData.impressions.toLocaleString()}</Text>
                 <Text variant="bodyMd" as="p" tone="subdued">👁️ Total Impressions</Text>
               </div>
             </Card>
             
             <Card>
               <div style={{ padding: '20px', textAlign: 'center' }}>
-                <Text variant="headingXl" as="p">{funnelData.step1Completions.toLocaleString()}</Text>
+                <Text variant="headingXl" as="p">{stableFunnelData.step1Completions.toLocaleString()}</Text>
                 <Text variant="bodyMd" as="p" tone="subdued">✅ Step 1 Completions</Text>
-                <Text variant="bodySm" as="p" tone="subdued">{funnelData.step1Dropoff}% drop-off</Text>
+                <Text variant="bodySm" as="p" tone="subdued">{stableFunnelData.step1Dropoff}% drop-off</Text>
               </div>
             </Card>
             
             <Card>
               <div style={{ padding: '20px', textAlign: 'center' }}>
-                <Text variant="headingXl" as="p">{funnelData.step2Completions.toLocaleString()}</Text>
+                <Text variant="headingXl" as="p">{stableFunnelData.step2Completions.toLocaleString()}</Text>
                 <Text variant="bodyMd" as="p" tone="subdued">✅ Step 2 Completions</Text>
-                <Text variant="bodySm" as="p" tone="subdued">{funnelData.step2Dropoff}% drop-off</Text>
+                <Text variant="bodySm" as="p" tone="subdued">{stableFunnelData.step2Dropoff}% drop-off</Text>
               </div>
             </Card>
             
             <Card>
               <div style={{ padding: '20px', textAlign: 'center' }}>
-                <Text variant="headingXl" as="p">{funnelData.step3Completions.toLocaleString()}</Text>
+                <Text variant="headingXl" as="p">{stableFunnelData.step3Completions.toLocaleString()}</Text>
                 <Text variant="bodyMd" as="p" tone="subdued">✅ Step 3 Completions</Text>
-                <Text variant="bodySm" as="p" tone="subdued">{funnelData.step3Dropoff}% drop-off</Text>
+                <Text variant="bodySm" as="p" tone="subdued">{stableFunnelData.step3Dropoff}% drop-off</Text>
               </div>
             </Card>
             
             <Card>
               <div style={{ padding: '20px', textAlign: 'center' }}>
-                <Text variant="headingXl" as="p">{funnelData.emailCompletions.toLocaleString()}</Text>
+                <Text variant="headingXl" as="p">{stableFunnelData.emailCompletions.toLocaleString()}</Text>
                 <Text variant="bodyMd" as="p" tone="subdued">📧 Email Completions</Text>
-                <Text variant="bodySm" as="p" tone="subdued">{funnelData.overallConversionRate}% conversion</Text>
+                <Text variant="bodySm" as="p" tone="subdued">{stableFunnelData.overallConversionRate}% conversion</Text>
               </div>
             </Card>
           </div>
@@ -310,13 +325,13 @@ export default function FunnelAnalytics() {
               </Text>
               
               <div style={{ marginTop: '20px' }}>
-                <FunnelBarChart data={useMemo(() => ({
-                  impressions: funnelData.impressions,
-                  step1Completions: funnelData.step1Completions,
-                  step2Completions: funnelData.step2Completions,
-                  step3Completions: funnelData.step3Completions,
-                  emailCompletions: funnelData.emailCompletions
-                }), [funnelData])} />
+                <FunnelBarChart data={{
+                  impressions: stableFunnelData.impressions,
+                  step1Completions: stableFunnelData.step1Completions,
+                  step2Completions: stableFunnelData.step2Completions,
+                  step3Completions: stableFunnelData.step3Completions,
+                  emailCompletions: stableFunnelData.emailCompletions
+                }} />
               </div>
             </div>
           </Card>
@@ -348,12 +363,12 @@ export default function FunnelAnalytics() {
               </Text>
               
               <div style={{ marginTop: '20px' }}>
-                <DropoffBarChart data={useMemo(() => ({
-                  step1Dropoff: funnelData.step1Dropoff,
-                  step2Dropoff: funnelData.step2Dropoff,
-                  step3Dropoff: funnelData.step3Dropoff,
-                  emailDropoff: funnelData.emailDropoff
-                }), [funnelData])} />
+                <DropoffBarChart data={{
+                  step1Dropoff: stableFunnelData.step1Dropoff,
+                  step2Dropoff: stableFunnelData.step2Dropoff,
+                  step3Dropoff: stableFunnelData.step3Dropoff,
+                  emailDropoff: stableFunnelData.emailDropoff
+                }} />
               </div>
             </div>
           </Card>
@@ -370,9 +385,9 @@ export default function FunnelAnalytics() {
                     Overall Performance
                   </Text>
                   <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '4px' }}>
-                    You have {funnelData.impressions.toLocaleString()} total impressions with {funnelData.emailCompletions} email completions.
+                    You have {stableFunnelData.impressions.toLocaleString()} total impressions with {stableFunnelData.emailCompletions} email completions.
                     {stats.activePopups > 0 ? ` ${stats.activePopups} popups are currently active.` : ' No popups are currently active.'}
-                    {funnelData.impressions > 0 ? ` Overall conversion rate: ${funnelData.overallConversionRate}%` : ''}
+                    {stableFunnelData.impressions > 0 ? ` Overall conversion rate: ${stableFunnelData.overallConversionRate}%` : ''}
                     {selectedPopupId !== 'all' ? ` (Filtered by popup: ${popups.find(p => p.id === selectedPopupId)?.name || 'Unknown'})` : ' (All popups)'}
                   </Text>
                 </div>
