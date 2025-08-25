@@ -1,5 +1,6 @@
 import { type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useNavigate, useSearchParams } from "@remix-run/react";
+import { useCallback, useMemo } from "react";
 import { 
   Page, 
   Layout, 
@@ -157,28 +158,34 @@ export default function FunnelAnalytics() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Handle popup filter change
-  const handlePopupFilterChange = (value: string) => {
+  // Handle popup filter change - wrapped in useCallback to prevent infinite re-renders
+  const handlePopupFilterChange = useCallback((value: string) => {
+    // Prevent navigation if the value hasn't actually changed
+    if ((value === 'all' && selectedPopupId === 'all') || value === selectedPopupId) {
+      return;
+    }
+    
     const newSearchParams = new URLSearchParams(searchParams);
     if (value === 'all') {
       newSearchParams.delete('popup');
     } else {
       newSearchParams.set('popup', value);
     }
+    
     navigate(`/app/funnel-analytics?${newSearchParams.toString()}`);
-  };
+  }, [selectedPopupId, searchParams, navigate]);
 
-  // Prepare popup filter options
-  const popupOptions = [
+  // Prepare popup filter options - memoized to prevent recreation on every render
+  const popupOptions = useMemo(() => [
     { label: 'All Popups', value: 'all' },
     ...popups.map(popup => ({
       label: popup.name,
       value: popup.id
     }))
-  ];
+  ], [popups]);
 
-  // Prepare recent emails table rows
-  const emailRows = recentEmails.map((email: any) => [
+  // Prepare recent emails table rows - memoized to prevent recreation on every render
+  const emailRows = useMemo(() => recentEmails.map((email: any) => [
     <Text key={`email-${email.id}`} variant="bodyMd" as="p" fontWeight="semibold">
       {email.email}
     </Text>,
@@ -188,7 +195,7 @@ export default function FunnelAnalytics() {
     <Text key={`date-${email.id}`} variant="bodyMd" as="p">
       {new Date(email.createdAt).toLocaleDateString()}
     </Text>
-  ]);
+  ]), [recentEmails]);
 
   return (
     <Page
@@ -303,13 +310,13 @@ export default function FunnelAnalytics() {
               </Text>
               
               <div style={{ marginTop: '20px' }}>
-                <FunnelBarChart data={{
+                <FunnelBarChart data={useMemo(() => ({
                   impressions: funnelData.impressions,
                   step1Completions: funnelData.step1Completions,
                   step2Completions: funnelData.step2Completions,
                   step3Completions: funnelData.step3Completions,
                   emailCompletions: funnelData.emailCompletions
-                }} />
+                }), [funnelData])} />
               </div>
             </div>
           </Card>
@@ -341,12 +348,12 @@ export default function FunnelAnalytics() {
               </Text>
               
               <div style={{ marginTop: '20px' }}>
-                <DropoffBarChart data={{
+                <DropoffBarChart data={useMemo(() => ({
                   step1Dropoff: funnelData.step1Dropoff,
                   step2Dropoff: funnelData.step2Dropoff,
                   step3Dropoff: funnelData.step3Dropoff,
                   emailDropoff: funnelData.emailDropoff
-                }} />
+                }), [funnelData])} />
               </div>
             </div>
           </Card>
