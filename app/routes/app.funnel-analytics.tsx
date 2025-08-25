@@ -1,5 +1,5 @@
 import { type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData, useNavigate, useSearchParams } from "@remix-run/react";
 import { 
   Page, 
   Layout, 
@@ -7,7 +7,8 @@ import {
   DataTable, 
   Button, 
   EmptyState,
-  Text
+  Text,
+  Select
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -24,6 +25,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   const { session } = await authenticate.admin(request);
+  
+  // Get popup filter from URL search params
+  const url = new URL(request.url);
+  const selectedPopupId = url.searchParams.get('popup') || 'all';
   
   // Get analytics data for this shop
   const shop = await prisma.shop.findUnique({
@@ -49,139 +54,87 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const activePopups = shop.popups.filter(p => p.status === 'ACTIVE').length;
   const totalPopups = shop.popups.length;
 
-  // Add PopupAnalytics data safely with multi-step tracking
+  // Build filter condition for popup
+  const popupFilter = selectedPopupId === 'all' ? {} : { popupId: selectedPopupId };
+
+  // Get real funnel data from CustomerSession table
   let funnelData = {
     impressions: 0,
-    clicks: 0,
-    conversions: 0,
-    clickRate: 0,
-    conversionRate: 0,
-    // Multi-step tracking
-    step1Views: 0,
-    step2Views: 0,
-    step3Views: 0,
     step1Completions: 0,
     step2Completions: 0,
     step3Completions: 0,
-    emailSubmissions: 0,
-    // Dropoff rates
-    clickToStep1Dropoff: 0,
-    step1ToStep2Dropoff: 0,
-    step2ToStep3Dropoff: 0,
-    step3ToEmailDropoff: 0
+    emailCompletions: 0,
+    // Dropoff rates (calculated)
+    step1Dropoff: 0,
+    step2Dropoff: 0,
+    step3Dropoff: 0,
+    emailDropoff: 0,
+    // Conversion rates
+    overallConversionRate: 0,
+    emailConversionRate: 0
   };
 
   try {
-    // Get basic funnel metrics from PopupAnalytics
-    const impressionsCount = await prisma.popupAnalytics.count({
+    // Get funnel metrics from CustomerSession table using our corrected tracking fields
+    const sessionsData = await prisma.customerSession.groupBy({
+      by: ['id'],
       where: {
         shopId: shop.id,
-        eventType: 'impression'
+        ...popupFilter
+      },
+      _count: {
+        id: true
       }
     });
 
-    const clicksCount = await prisma.popupAnalytics.count({
+    // Get detailed funnel breakdown
+    const funnelMetrics = await prisma.customerSession.findMany({
       where: {
         shopId: shop.id,
-        eventType: 'click'
+        ...popupFilter
+      },
+      select: {
+        stepsViewed: true,
+        stepsCompleted: true,
+        emailProvided: true,
+        completedAt: true
       }
     });
 
-    const conversionsCount = await prisma.popupAnalytics.count({
-      where: {
-        shopId: shop.id,
-        eventType: 'complete'
-      }
-    });
-
-    // Get step-specific analytics
-    const step1ViewsCount = await prisma.popupAnalytics.count({
-      where: {
-        shopId: shop.id,
-        eventType: 'step_view',
-        stepNumber: 1
-      }
-    });
-
-    const step2ViewsCount = await prisma.popupAnalytics.count({
-      where: {
-        shopId: shop.id,
-        eventType: 'step_view',
-        stepNumber: 2
-      }
-    });
-
-    const step3ViewsCount = await prisma.popupAnalytics.count({
-      where: {
-        shopId: shop.id,
-        eventType: 'step_view',
-        stepNumber: 3
-      }
-    });
-
-    const step1CompletionsCount = await prisma.popupAnalytics.count({
-      where: {
-        shopId: shop.id,
-        eventType: 'step_complete',
-        stepNumber: 1
-      }
-    });
-
-    const step2CompletionsCount = await prisma.popupAnalytics.count({
-      where: {
-        shopId: shop.id,
-        eventType: 'step_complete',
-        stepNumber: 2
-      }
-    });
-
-    const step3CompletionsCount = await prisma.popupAnalytics.count({
-      where: {
-        shopId: shop.id,
-        eventType: 'step_complete',
-        stepNumber: 3
-      }
-    });
-
-    const emailSubmissionsCount = await prisma.popupAnalytics.count({
-      where: {
-        shopId: shop.id,
-        eventType: 'email_provided'
-      }
-    });
-
-    // Calculate rates safely
-    const clickRate = impressionsCount > 0 ? Math.round((clicksCount / impressionsCount) * 100) : 0;
-    const conversionRate = clicksCount > 0 ? Math.round((conversionsCount / clicksCount) * 100) : 0;
+    // Calculate funnel stages
+    const totalImpressions = funnelMetrics.length;
+    const step1Completions = funnelMetrics.filter(session => session.stepsCompleted >= 1).length;
+    const step2Completions = funnelMetrics.filter(session => session.stepsCompleted >= 2).length;
+    const step3Completions = funnelMetrics.filter(session => session.stepsCompleted >= 3).length;
+    const emailCompletions = funnelMetrics.filter(session => session.emailProvided).length;
 
     // Calculate dropoff rates
-    const clickToStep1Dropoff = clicksCount > 0 ? Math.round(((clicksCount - step1ViewsCount) / clicksCount) * 100) : 0;
-    const step1ToStep2Dropoff = step1CompletionsCount > 0 ? Math.round(((step1CompletionsCount - step2ViewsCount) / step1CompletionsCount) * 100) : 0;
-    const step2ToStep3Dropoff = step2CompletionsCount > 0 ? Math.round(((step2CompletionsCount - step3ViewsCount) / step2CompletionsCount) * 100) : 0;
-    const step3ToEmailDropoff = step3CompletionsCount > 0 ? Math.round(((step3CompletionsCount - emailSubmissionsCount) / step3CompletionsCount) * 100) : 0;
+    const step1Dropoff = totalImpressions > 0 ? Math.round(((totalImpressions - step1Completions) / totalImpressions) * 100) : 0;
+    const step2Dropoff = step1Completions > 0 ? Math.round(((step1Completions - step2Completions) / step1Completions) * 100) : 0;
+    const step3Dropoff = step2Completions > 0 ? Math.round(((step2Completions - step3Completions) / step2Completions) * 100) : 0;
+    const emailDropoff = step3Completions > 0 ? Math.round(((step3Completions - emailCompletions) / step3Completions) * 100) : 0;
+
+    // Calculate conversion rates
+    const overallConversionRate = totalImpressions > 0 ? Math.round((emailCompletions / totalImpressions) * 100) : 0;
+    const emailConversionRate = totalImpressions > 0 ? Math.round((emailCompletions / totalImpressions) * 100) : 0;
 
     funnelData = {
-      impressions: impressionsCount,
-      clicks: clicksCount,
-      conversions: conversionsCount,
-      clickRate,
-      conversionRate,
-      // Multi-step data
-      step1Views: step1ViewsCount,
-      step2Views: step2ViewsCount,
-      step3Views: step3ViewsCount,
-      step1Completions: step1CompletionsCount,
-      step2Completions: step2CompletionsCount,
-      step3Completions: step3CompletionsCount,
-      emailSubmissions: emailSubmissionsCount,
+      impressions: totalImpressions,
+      step1Completions,
+      step2Completions,
+      step3Completions,
+      emailCompletions,
       // Dropoff rates
-      clickToStep1Dropoff: Math.max(0, clickToStep1Dropoff),
-      step1ToStep2Dropoff: Math.max(0, step1ToStep2Dropoff),
-      step2ToStep3Dropoff: Math.max(0, step2ToStep3Dropoff),
-      step3ToEmailDropoff: Math.max(0, step3ToEmailDropoff)
+      step1Dropoff: Math.max(0, step1Dropoff),
+      step2Dropoff: Math.max(0, step2Dropoff),
+      step3Dropoff: Math.max(0, step3Dropoff),
+      emailDropoff: Math.max(0, emailDropoff),
+      // Conversion rates
+      overallConversionRate,
+      emailConversionRate
     };
   } catch (error) {
-    console.log('PopupAnalytics query error:', error);
+    console.log('CustomerSession analytics query error:', error);
     // Keep default values if queries fail
   }
 
@@ -193,12 +146,36 @@ export async function loader({ request }: LoaderFunctionArgs) {
       totalPopups
     },
     funnelData,
-    recentEmails: shop.emails
+    recentEmails: shop.emails,
+    selectedPopupId,
+    popups: shop.popups
   };
 }
 
 export default function FunnelAnalytics() {
-  const { shop, stats, funnelData, recentEmails } = useLoaderData<typeof loader>();
+  const { shop, stats, funnelData, recentEmails, selectedPopupId, popups } = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Handle popup filter change
+  const handlePopupFilterChange = (value: string) => {
+    const newSearchParams = new URLSearchParams(searchParams);
+    if (value === 'all') {
+      newSearchParams.delete('popup');
+    } else {
+      newSearchParams.set('popup', value);
+    }
+    navigate(`/app/funnel-analytics?${newSearchParams.toString()}`);
+  };
+
+  // Prepare popup filter options
+  const popupOptions = [
+    { label: 'All Popups', value: 'all' },
+    ...popups.map(popup => ({
+      label: popup.name,
+      value: popup.id
+    }))
+  ];
 
   // Prepare recent emails table rows
   const emailRows = recentEmails.map((email: any) => [
@@ -223,16 +200,25 @@ export default function FunnelAnalytics() {
       }}
     >
       <Layout>
+        {/* Popup Filter */}
+        <Layout.Section>
+          <Card>
+            <div style={{ padding: '20px' }}>
+              <Text variant="headingMd" as="h2">Filter by Popup</Text>
+              <div style={{ marginTop: '12px', maxWidth: '300px' }}>
+                <Select
+                  label=""
+                  options={popupOptions}
+                  value={selectedPopupId}
+                  onChange={handlePopupFilterChange}
+                />
+              </div>
+            </div>
+          </Card>
+        </Layout.Section>
         {/* Stats Cards */}
         <Layout.Section>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-            <Card>
-              <div style={{ padding: '20px', textAlign: 'center' }}>
-                <Text variant="headingXl" as="p">{stats.totalEmails}</Text>
-                <Text variant="bodyMd" as="p" tone="subdued">📧 Emails Collected</Text>
-              </div>
-            </Card>
-            
             <Card>
               <div style={{ padding: '20px', textAlign: 'center' }}>
                 <Text variant="headingXl" as="p">{funnelData.impressions.toLocaleString()}</Text>
@@ -242,23 +228,33 @@ export default function FunnelAnalytics() {
             
             <Card>
               <div style={{ padding: '20px', textAlign: 'center' }}>
-                <Text variant="headingXl" as="p">{funnelData.clicks.toLocaleString()}</Text>
-                <Text variant="bodyMd" as="p" tone="subdued">🖱️ Clicks</Text>
-                <Text variant="bodySm" as="p" tone="subdued">{funnelData.clickRate}% click rate</Text>
+                <Text variant="headingXl" as="p">{funnelData.step1Completions.toLocaleString()}</Text>
+                <Text variant="bodyMd" as="p" tone="subdued">✅ Step 1 Completions</Text>
+                <Text variant="bodySm" as="p" tone="subdued">{funnelData.step1Dropoff}% drop-off</Text>
               </div>
             </Card>
             
             <Card>
               <div style={{ padding: '20px', textAlign: 'center' }}>
-                <Text variant="headingXl" as="p">{stats.activePopups}</Text>
-                <Text variant="bodyMd" as="p" tone="subdued">🟢 Active Popups</Text>
+                <Text variant="headingXl" as="p">{funnelData.step2Completions.toLocaleString()}</Text>
+                <Text variant="bodyMd" as="p" tone="subdued">✅ Step 2 Completions</Text>
+                <Text variant="bodySm" as="p" tone="subdued">{funnelData.step2Dropoff}% drop-off</Text>
               </div>
             </Card>
             
             <Card>
               <div style={{ padding: '20px', textAlign: 'center' }}>
-                <Text variant="headingXl" as="p">{stats.totalPopups}</Text>
-                <Text variant="bodyMd" as="p" tone="subdued">📊 Total Popups</Text>
+                <Text variant="headingXl" as="p">{funnelData.step3Completions.toLocaleString()}</Text>
+                <Text variant="bodyMd" as="p" tone="subdued">✅ Step 3 Completions</Text>
+                <Text variant="bodySm" as="p" tone="subdued">{funnelData.step3Dropoff}% drop-off</Text>
+              </div>
+            </Card>
+            
+            <Card>
+              <div style={{ padding: '20px', textAlign: 'center' }}>
+                <Text variant="headingXl" as="p">{funnelData.emailCompletions.toLocaleString()}</Text>
+                <Text variant="bodyMd" as="p" tone="subdued">📧 Email Completions</Text>
+                <Text variant="bodySm" as="p" tone="subdued">{funnelData.overallConversionRate}% conversion</Text>
               </div>
             </Card>
           </div>
@@ -309,9 +305,10 @@ export default function FunnelAnalytics() {
               <div style={{ marginTop: '20px' }}>
                 <FunnelBarChart data={{
                   impressions: funnelData.impressions,
-                  clicks: funnelData.clicks,
-                  conversions: funnelData.conversions,
-                  emailSubmissions: funnelData.emailSubmissions
+                  step1Completions: funnelData.step1Completions,
+                  step2Completions: funnelData.step2Completions,
+                  step3Completions: funnelData.step3Completions,
+                  emailCompletions: funnelData.emailCompletions
                 }} />
               </div>
             </div>
@@ -345,10 +342,10 @@ export default function FunnelAnalytics() {
               
               <div style={{ marginTop: '20px' }}>
                 <DropoffBarChart data={{
-                  clickToStep1Dropoff: funnelData.clickToStep1Dropoff,
-                  step1ToStep2Dropoff: funnelData.step1ToStep2Dropoff,
-                  step2ToStep3Dropoff: funnelData.step2ToStep3Dropoff,
-                  step3ToEmailDropoff: funnelData.step3ToEmailDropoff
+                  step1Dropoff: funnelData.step1Dropoff,
+                  step2Dropoff: funnelData.step2Dropoff,
+                  step3Dropoff: funnelData.step3Dropoff,
+                  emailDropoff: funnelData.emailDropoff
                 }} />
               </div>
             </div>
@@ -366,9 +363,10 @@ export default function FunnelAnalytics() {
                     Overall Performance
                   </Text>
                   <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '4px' }}>
-                    You have collected {stats.totalEmails} emails across {stats.totalPopups} popups.
+                    You have {funnelData.impressions.toLocaleString()} total impressions with {funnelData.emailCompletions} email completions.
                     {stats.activePopups > 0 ? ` ${stats.activePopups} popups are currently active.` : ' No popups are currently active.'}
-                    {funnelData.impressions > 0 ? ` Overall conversion rate: ${funnelData.conversionRate}%` : ''}
+                    {funnelData.impressions > 0 ? ` Overall conversion rate: ${funnelData.overallConversionRate}%` : ''}
+                    {selectedPopupId !== 'all' ? ` (Filtered by popup: ${popups.find(p => p.id === selectedPopupId)?.name || 'Unknown'})` : ' (All popups)'}
                   </Text>
                 </div>
               </div>

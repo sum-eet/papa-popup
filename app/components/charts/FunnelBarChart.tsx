@@ -3,9 +3,10 @@ import { Text } from '@shopify/polaris';
 
 interface FunnelData {
   impressions: number;
-  clicks: number;
-  conversions: number;
-  emailSubmissions: number;
+  step1Completions: number;
+  step2Completions: number;
+  step3Completions: number;
+  emailCompletions: number;
 }
 
 interface FunnelBarChartProps {
@@ -24,10 +25,13 @@ const SHOPIFY_COLORS = {
 
 export function FunnelBarChart({ data }: FunnelBarChartProps) {
   // Calculate rates
-  const clickRate = data.impressions > 0 ? Math.round((data.clicks / data.impressions) * 100) : 0;
-  const conversionRate = data.clicks > 0 ? Math.round((data.emailSubmissions / data.clicks) * 100) : 0;
+  const step1Rate = data.impressions > 0 ? Math.round((data.step1Completions / data.impressions) * 100) : 0;
+  const step2Rate = data.step1Completions > 0 ? Math.round((data.step2Completions / data.step1Completions) * 100) : 0;
+  const step3Rate = data.step2Completions > 0 ? Math.round((data.step3Completions / data.step2Completions) * 100) : 0;
+  const emailRate = data.step3Completions > 0 ? Math.round((data.emailCompletions / data.step3Completions) * 100) : 0;
+  const overallConversionRate = data.impressions > 0 ? Math.round((data.emailCompletions / data.impressions) * 100) : 0;
   
-  // Prepare chart data - only include steps with data
+  // Prepare chart data - always show all funnel stages
   const chartData = [
     {
       name: 'Impressions',
@@ -37,30 +41,39 @@ export function FunnelBarChart({ data }: FunnelBarChartProps) {
     }
   ];
 
-  if (data.clicks > 0) {
+  if (data.step1Completions >= 0) {
     chartData.push({
-      name: 'Clicks',
-      value: data.clicks,
-      color: clickRate > 10 ? SHOPIFY_COLORS.success : clickRate > 5 ? SHOPIFY_COLORS.warning : SHOPIFY_COLORS.danger,
-      percentage: clickRate
+      name: 'Step 1',
+      value: data.step1Completions,
+      color: step1Rate > 70 ? SHOPIFY_COLORS.success : step1Rate > 40 ? SHOPIFY_COLORS.warning : SHOPIFY_COLORS.danger,
+      percentage: step1Rate
     });
   }
 
-  if (data.conversions > 0) {
+  if (data.step2Completions >= 0) {
     chartData.push({
-      name: 'Conversions',
-      value: data.conversions,
-      color: SHOPIFY_COLORS.primary,
-      percentage: data.impressions > 0 ? Math.round((data.conversions / data.impressions) * 100) : 0
+      name: 'Step 2',
+      value: data.step2Completions,
+      color: step2Rate > 70 ? SHOPIFY_COLORS.success : step2Rate > 40 ? SHOPIFY_COLORS.warning : SHOPIFY_COLORS.danger,
+      percentage: data.impressions > 0 ? Math.round((data.step2Completions / data.impressions) * 100) : 0
     });
   }
 
-  if (data.emailSubmissions > 0) {
+  if (data.step3Completions >= 0) {
+    chartData.push({
+      name: 'Step 3',
+      value: data.step3Completions,
+      color: step3Rate > 70 ? SHOPIFY_COLORS.success : step3Rate > 40 ? SHOPIFY_COLORS.warning : SHOPIFY_COLORS.danger,
+      percentage: data.impressions > 0 ? Math.round((data.step3Completions / data.impressions) * 100) : 0
+    });
+  }
+
+  if (data.emailCompletions >= 0) {
     chartData.push({
       name: 'Emails',
-      value: data.emailSubmissions,
+      value: data.emailCompletions,
       color: SHOPIFY_COLORS.success,
-      percentage: data.impressions > 0 ? Math.round((data.emailSubmissions / data.impressions) * 100) : 0
+      percentage: data.impressions > 0 ? Math.round((data.emailCompletions / data.impressions) * 100) : 0
     });
   }
 
@@ -174,11 +187,11 @@ export function FunnelBarChart({ data }: FunnelBarChartProps) {
         <Text variant="bodySm" as="p" tone="subdued" style={{ marginTop: '4px' }}>
           {data.impressions > 0 ? (
             <>
-              Overall conversion rate: <strong>{conversionRate}%</strong>
-              {' • '}Click-through rate: <strong>{clickRate}%</strong>
-              {data.emailSubmissions > 0 && (
+              Overall conversion rate: <strong>{overallConversionRate}%</strong>
+              {' • '}Step 1 completion: <strong>{step1Rate}%</strong>
+              {data.emailCompletions > 0 && (
                 <>
-                  {' • '}Email capture: <strong>{Math.round((data.emailSubmissions / data.impressions) * 100)}%</strong>
+                  {' • '}Email capture: <strong>{Math.round((data.emailCompletions / data.impressions) * 100)}%</strong>
                 </>
               )}
             </>

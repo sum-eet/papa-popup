@@ -120,31 +120,50 @@ export async function action({ request }: ActionFunctionArgs) {
       
       // Move to next step if not already there
       if (stepNumber >= newCurrentStep) {
-        newCurrentStep = Math.min(stepNumber + 1, customerSession.popup.totalSteps);
+        newCurrentStep = Math.min(stepNumber + 1, customerSession.popup?.totalSteps || stepNumber + 1);
       }
     } else if (stepAction === 'navigate') {
       // Just update current step (for back/forward navigation)
-      newCurrentStep = Math.max(1, Math.min(stepNumber, customerSession.popup.totalSteps));
+      newCurrentStep = Math.max(1, Math.min(stepNumber, customerSession.popup?.totalSteps || stepNumber));
     } else if (stepAction === 'complete') {
       // Mark session as completed
       completedAt = new Date();
-      newCurrentStep = customerSession.popup.totalSteps;
+      newCurrentStep = customerSession.popup?.totalSteps || newCurrentStep;
     }
 
-    // Update customer session
+    // Calculate tracking metrics
+    const responseKeys = Object.keys(updatedResponses).filter(key => key.startsWith('step_'));
+    const totalSteps = customerSession.popup?.totalSteps || newCurrentStep;
+    const stepsCompleted = completedAt ? totalSteps : responseKeys.length;
+    const stepsViewed = completedAt ? totalSteps : Math.max(newCurrentStep, responseKeys.length);
+    
+    // Check if email was provided - look for email patterns in responses
+    const hasEmailResponse = Object.values(updatedResponses).some(response => {
+      if (typeof response === 'string') {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(response.trim());
+      }
+      return false;
+    });
+    const emailProvided = hasEmailResponse || (completedAt && (customerSession.popup?.emailRequired || false));
+
+    // Update customer session with tracking metrics
     const updatedSession = await prisma.customerSession.update({
       where: { id: customerSession.id },
       data: {
         currentStep: newCurrentStep,
+        stepsViewed,
+        stepsCompleted,
+        emailProvided,
         responses: JSON.stringify(updatedResponses),
         completedAt
       }
     });
 
-    console.log(`[Session Progress] Updated session ${sessionToken}: step ${newCurrentStep}/${customerSession.popup.totalSteps}, action: ${stepAction}`);
+    console.log(`[Session Progress] Updated session ${sessionToken}: step ${newCurrentStep}/${totalSteps}, action: ${stepAction}`);
 
     // Determine next step info
-    const nextStep = customerSession.popup.steps.find(step => step.stepNumber === newCurrentStep);
+    const nextStep = customerSession.popup?.steps?.find(step => step.stepNumber === newCurrentStep);
     const nextStepContent = nextStep ? (
       typeof nextStep.content === 'string' 
         ? JSON.parse(nextStep.content) 
@@ -156,7 +175,7 @@ export async function action({ request }: ActionFunctionArgs) {
         success: true,
         sessionToken: updatedSession.sessionToken,
         currentStep: newCurrentStep,
-        totalSteps: customerSession.popup.totalSteps,
+        totalSteps: totalSteps,
         responses: updatedResponses,
         isCompleted: !!completedAt,
         nextStep: nextStep ? {

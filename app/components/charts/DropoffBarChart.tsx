@@ -2,10 +2,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Text } from '@shopify/polaris';
 
 interface DropoffData {
-  clickToStep1Dropoff: number;
-  step1ToStep2Dropoff: number;
-  step2ToStep3Dropoff: number;
-  step3ToEmailDropoff: number;
+  step1Dropoff: number;
+  step2Dropoff: number;
+  step3Dropoff: number;
+  emailDropoff: number;
 }
 
 interface DropoffBarChartProps {
@@ -23,42 +23,42 @@ const SHOPIFY_COLORS = {
 };
 
 export function DropoffBarChart({ data }: DropoffBarChartProps) {
-  // Prepare chart data - only include dropoffs with data
+  // Prepare chart data - show all dropoff stages
   const chartData = [];
 
-  if (data.clickToStep1Dropoff > 0) {
+  if (data.step1Dropoff >= 0) {
     chartData.push({
-      name: 'Click → Step 1',
-      value: data.clickToStep1Dropoff,
-      color: data.clickToStep1Dropoff > 50 ? SHOPIFY_COLORS.danger : 
-             data.clickToStep1Dropoff > 25 ? SHOPIFY_COLORS.warning : SHOPIFY_COLORS.success
+      name: 'Step 1 Drop-off',
+      value: data.step1Dropoff,
+      color: data.step1Dropoff > 50 ? SHOPIFY_COLORS.danger : 
+             data.step1Dropoff > 25 ? SHOPIFY_COLORS.warning : SHOPIFY_COLORS.success
     });
   }
 
-  if (data.step1ToStep2Dropoff > 0) {
+  if (data.step2Dropoff >= 0) {
     chartData.push({
-      name: 'Step 1 → Step 2',
-      value: data.step1ToStep2Dropoff,
-      color: data.step1ToStep2Dropoff > 50 ? SHOPIFY_COLORS.danger : 
-             data.step1ToStep2Dropoff > 25 ? SHOPIFY_COLORS.warning : SHOPIFY_COLORS.success
+      name: 'Step 2 Drop-off',
+      value: data.step2Dropoff,
+      color: data.step2Dropoff > 50 ? SHOPIFY_COLORS.danger : 
+             data.step2Dropoff > 25 ? SHOPIFY_COLORS.warning : SHOPIFY_COLORS.success
     });
   }
 
-  if (data.step2ToStep3Dropoff > 0) {
+  if (data.step3Dropoff >= 0) {
     chartData.push({
-      name: 'Step 2 → Step 3',
-      value: data.step2ToStep3Dropoff,
-      color: data.step2ToStep3Dropoff > 50 ? SHOPIFY_COLORS.danger : 
-             data.step2ToStep3Dropoff > 25 ? SHOPIFY_COLORS.warning : SHOPIFY_COLORS.success
+      name: 'Step 3 Drop-off',
+      value: data.step3Dropoff,
+      color: data.step3Dropoff > 50 ? SHOPIFY_COLORS.danger : 
+             data.step3Dropoff > 25 ? SHOPIFY_COLORS.warning : SHOPIFY_COLORS.success
     });
   }
 
-  if (data.step3ToEmailDropoff > 0) {
+  if (data.emailDropoff >= 0) {
     chartData.push({
-      name: 'Step 3 → Email',
-      value: data.step3ToEmailDropoff,
-      color: data.step3ToEmailDropoff > 50 ? SHOPIFY_COLORS.danger : 
-             data.step3ToEmailDropoff > 25 ? SHOPIFY_COLORS.warning : SHOPIFY_COLORS.success
+      name: 'Email Drop-off',
+      value: data.emailDropoff,
+      color: data.emailDropoff > 50 ? SHOPIFY_COLORS.danger : 
+             data.emailDropoff > 25 ? SHOPIFY_COLORS.warning : SHOPIFY_COLORS.success
     });
   }
 

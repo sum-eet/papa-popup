@@ -87,7 +87,64 @@ export async function loader({ request }: LoaderFunctionArgs) {
     envVars
   });
 
-  // Test 6: Try a specific popup query (similar to what design route does)
+  // Test 6: Check for recent CustomerSession entries (last 24 hours)
+  try {
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentSessions = await prisma.customerSession.findMany({
+      where: {
+        createdAt: {
+          gte: twentyFourHoursAgo
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 10,
+      select: {
+        id: true,
+        sessionToken: true,
+        currentStep: true,
+        stepsViewed: true,
+        stepsCompleted: true,
+        responses: true,
+        completedAt: true,
+        createdAt: true,
+        popup: {
+          select: {
+            name: true,
+            totalSteps: true
+          }
+        }
+      }
+    });
+
+    debugResults.tests.push({
+      name: "Recent CustomerSession Entries (24h)",
+      status: "SUCCESS",
+      message: `Found ${recentSessions.length} recent sessions`,
+      data: recentSessions.map(session => ({
+        sessionToken: session.sessionToken.slice(-8), // Show last 8 chars for privacy
+        currentStep: session.currentStep,
+        stepsViewed: session.stepsViewed,
+        stepsCompleted: session.stepsCompleted,
+        hasResponses: !!session.responses,
+        responses: session.responses,
+        completed: !!session.completedAt,
+        popupName: session.popup?.name,
+        totalSteps: session.popup?.totalSteps,
+        createdAt: session.createdAt.toISOString(),
+        ageMinutes: Math.round((Date.now() - session.createdAt.getTime()) / (1000 * 60))
+      }))
+    });
+  } catch (error) {
+    debugResults.tests.push({
+      name: "Recent CustomerSession Entries",
+      status: "FAILED",
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+
+  // Test 7: Try a specific popup query (similar to what design route does)
   try {
     const url = new URL(request.url);
     const testPopupId = url.searchParams.get('popupId');
