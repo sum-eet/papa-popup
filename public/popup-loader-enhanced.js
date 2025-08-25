@@ -166,43 +166,19 @@
     return false; // All endpoints failed
   }
 
-  // Enhanced analytics tracking with queue and retry
+  // Enhanced analytics tracking - DISABLED for debugging
   function trackAnalyticsEvent(eventType, metadata = {}) {
-    try {
-      const eventData = {
-        eventType,
-        shopDomain: window.Shopify?.shop || window.location.hostname,
-        sessionToken: currentPopupState.sessionToken,
-        popupId: currentPopupState.popup?.id,
-        stepNumber: currentPopupState.currentStep,
-        metadata,
-        pageUrl: window.location.href,
-        userAgent: navigator.userAgent
-      };
+    // Temporarily disabled to prevent API spam and popup breaking
+    console.log(`📊 Papa Popup: Analytics disabled - would track: ${eventType}`, metadata);
+    return true;
+  }
 
-      console.log('📊 Papa Popup: Preparing to track event:', eventType, eventData);
-
-      // Try to send immediately
-      sendAnalyticsEvent(eventData).then(success => {
-        if (!success) {
-          // If immediate send fails, queue for retry
-          console.log('📦 Papa Popup: Immediate send failed, queueing event:', eventType);
-          queueAnalyticsEvent(eventData);
-        }
-      }).catch(error => {
-        console.error('💥 Papa Popup: Analytics tracking failed, queueing event:', error);
-        queueAnalyticsEvent(eventData);
-      });
-
-      // Process any existing queued events
-      processAnalyticsQueue().catch(error => {
-        console.error('💥 Papa Popup: Queue processing failed:', error);
-      });
-      
-      console.log('📊 Papa Popup: Event tracking initiated for:', eventType, metadata);
-    } catch (error) {
-      console.error('💥 Papa Popup: Analytics error:', error);
+  // Get current step from popup state
+  function getCurrentStep() {
+    if (!currentPopupState.popup || !currentPopupState.popup.steps) {
+      return null;
     }
+    return currentPopupState.popup.steps.find(step => step.stepNumber === currentPopupState.currentStep);
   }
 
   // Track loaded CSS to avoid duplicates
@@ -820,7 +796,28 @@
 
     } catch (error) {
       console.error('💥 Papa Popup: Navigation failed:', error);
-      alert('Sorry, there was an error. Please try again.');
+      
+      // For debugging - try to continue without server sync
+      console.log('🔄 Papa Popup: Attempting local navigation fallback...');
+      try {
+        // Update local state manually
+        if (direction === 'next') {
+          currentPopupState.currentStep = Math.min(currentPopupState.currentStep + 1, currentPopupState.popup?.totalSteps || currentPopupState.currentStep + 1);
+        } else {
+          currentPopupState.currentStep = Math.max(1, currentPopupState.currentStep - 1);
+        }
+        
+        // Save updated state locally
+        localStorage.setItem(SESSION_KEY, JSON.stringify(currentPopupState));
+        
+        // Try to update content
+        updatePopupContent();
+        
+        console.log('✅ Papa Popup: Local navigation successful to step:', currentPopupState.currentStep);
+      } catch (fallbackError) {
+        console.error('💥 Papa Popup: Local navigation also failed:', fallbackError);
+        alert('Sorry, there was an error. Please try again.');
+      }
     }
   }
 
