@@ -8,57 +8,273 @@ export default function Privacy() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Privacy Policy - Papa Popup</title>
         <style>{`
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          
           body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
             line-height: 1.6; 
-            color: #333; 
-            max-width: 800px; 
-            margin: 0 auto; 
-            padding: 20px;
-            background: #f9f9f9;
+            color: #333;
+            background: #f8fafc;
+            padding-top: 80px;
           }
+          
+          /* Navigation */
+          .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            padding: 0;
+          }
+          
+          .navbar .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+          }
+          
+          .nav-brand a {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #667eea;
+            text-decoration: none;
+          }
+          
+          .nav-menu {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+          }
+          
+          .nav-link {
+            color: #4a5568;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+          }
+          
+          .nav-link:hover {
+            color: #667eea;
+          }
+          
+          .nav-link.active {
+            color: #667eea;
+            font-weight: 600;
+          }
+          
+          .nav-cta {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+          }
+          
+          .nav-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+          }
+          
+          .nav-toggle {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+            gap: 4px;
+          }
+          
+          .nav-toggle span {
+            width: 25px;
+            height: 3px;
+            background: #4a5568;
+            border-radius: 3px;
+            transition: all 0.3s ease;
+          }
+          
+          /* Header */
+          .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 100px 0 60px;
+            text-align: center;
+          }
+          
+          .header h1 {
+            font-size: 2.8rem;
+            margin-bottom: 20px;
+            font-weight: 700;
+          }
+          
+          .header .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+          }
+          
           .container { 
-            background: white; 
-            padding: 40px; 
-            border-radius: 8px; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            max-width: 900px; 
+            margin: 0 auto; 
+            padding: 0 20px;
           }
-          h1 { 
-            color: #2c5aa0; 
-            border-bottom: 3px solid #2c5aa0; 
-            padding-bottom: 10px;
+          
+          .content {
+            background: white;
+            margin: -40px auto 0;
+            padding: 60px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 1;
           }
+          
+          .last-updated {
+            background: #f7fafc;
+            padding: 15px 25px;
+            border-radius: 8px;
+            margin-bottom: 40px;
+            text-align: center;
+            font-weight: 600;
+            color: #4a5568;
+          }
+          
           h2 { 
-            color: #2c5aa0; 
-            margin-top: 30px;
+            color: #2d3748; 
+            margin: 40px 0 20px 0;
+            font-size: 1.6rem;
+            font-weight: 700;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e2e8f0;
           }
+          
+          h2:first-of-type {
+            margin-top: 0;
+          }
+          
+          p {
+            margin-bottom: 16px;
+            color: #4a5568;
+            font-size: 1rem;
+          }
+          
           ul { 
-            padding-left: 20px;
+            padding-left: 25px;
+            margin-bottom: 20px;
           }
+          
           li { 
-            margin: 8px 0;
+            margin: 10px 0;
+            color: #4a5568;
           }
+          
+          li strong {
+            color: #2d3748;
+          }
+          
           .highlight { 
-            background: #e3f2fd; 
-            padding: 15px; 
-            border-radius: 5px; 
-            margin: 20px 0;
-            border-left: 4px solid #2c5aa0;
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            padding: 25px; 
+            border-radius: 12px; 
+            margin: 30px 0;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
           }
+          
           .gdpr { 
-            background: #f3e5f5; 
-            padding: 15px; 
-            border-radius: 5px; 
-            margin: 20px 0;
-            border-left: 4px solid #7b1fa2;
+            background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+            padding: 25px; 
+            border-radius: 12px; 
+            margin: 30px 0;
+            border-left: 4px solid #9c27b0;
+            box-shadow: 0 4px 12px rgba(156, 39, 176, 0.15);
+          }
+          
+          .highlight p,
+          .gdpr p {
+            margin-bottom: 0;
+            font-weight: 500;
+          }
+          
+          /* Footer */
+          .footer {
+            background: #1a202c;
+            color: white;
+            padding: 40px 0;
+            text-align: center;
+            margin-top: 80px;
+          }
+          
+          .footer p {
+            color: #718096;
+          }
+          
+          /* Responsive */
+          @media (max-width: 768px) {
+            .nav-menu {
+              display: none;
+              position: absolute;
+              top: 100%;
+              left: 0;
+              right: 0;
+              background: white;
+              flex-direction: column;
+              padding: 20px;
+              box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+              gap: 15px;
+            }
+            
+            .nav-toggle {
+              display: flex;
+            }
+            
+            .header h1 { font-size: 2.2rem; }
+            .content { padding: 40px 25px; margin-top: -30px; }
+            .container { padding: 0 15px; }
+            body { padding-top: 70px; }
           }
         `}</style>
       </head>
       <body>
+        {/* Navigation */}
+        <nav className="navbar">
+          <div className="container">
+            <div className="nav-brand">
+              <a href="/home">Papa Popup</a>
+            </div>
+            <div className="nav-menu">
+              <a href="/pricing" className="nav-link">Pricing</a>
+              <a href="/privacy" className="nav-link active">Privacy</a>
+              <a href="#" className="nav-cta">Start Free Trial</a>
+            </div>
+            <div className="nav-toggle">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+        </nav>
+
+        {/* Header */}
+        <section className="header">
+          <div className="container">
+            <h1>Privacy Policy</h1>
+            <p className="subtitle">How we protect and handle your data with complete transparency</p>
+          </div>
+        </section>
+
         <div className="container">
-          <h1>Privacy Policy for Papa Popup</h1>
-          
-          <p><strong>Last Updated:</strong> {new Date().toLocaleDateString()}</p>
+          <div className="content">
+            <div className="last-updated">
+              <p><strong>Last Updated:</strong> {new Date().toLocaleDateString()}</p>
+            </div>
 
           <h2>1. Information We Collect</h2>
           <p>Papa Popup collects and processes the following information:</p>
@@ -150,7 +366,15 @@ export default function Privacy() {
           <div className="highlight">
             <p><strong>California Privacy Rights:</strong> California residents have specific rights under CCPA. You may request information about the categories of personal information we collect, the purposes for collection, and with whom we share information. You may also request deletion of your personal information.</p>
           </div>
+          </div>
         </div>
+
+        {/* Footer */}
+        <footer className="footer">
+          <div className="container">
+            <p>&copy; 2025 Papa Popup. All rights reserved. Built for Shopify merchants worldwide.</p>
+          </div>
+        </footer>
       </body>
     </html>
   );

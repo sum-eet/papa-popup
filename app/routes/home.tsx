@@ -14,6 +14,81 @@ export default function Homepage() {
             line-height: 1.6; 
             color: #333;
             background: #f8fafc;
+            padding-top: 80px;
+          }
+          
+          /* Navigation */
+          .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            padding: 0;
+          }
+          
+          .navbar .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+          }
+          
+          .nav-brand a {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #667eea;
+            text-decoration: none;
+          }
+          
+          .nav-menu {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+          }
+          
+          .nav-link {
+            color: #4a5568;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+          }
+          
+          .nav-link:hover {
+            color: #667eea;
+          }
+          
+          .nav-cta {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+          }
+          
+          .nav-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+          }
+          
+          .nav-toggle {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+            gap: 4px;
+          }
+          
+          .nav-toggle span {
+            width: 25px;
+            height: 3px;
+            background: #4a5568;
+            border-radius: 3px;
+            transition: all 0.3s ease;
           }
           
           .container { 
@@ -336,20 +411,57 @@ export default function Homepage() {
           
           /* Responsive */
           @media (max-width: 768px) {
+            .nav-menu {
+              display: none;
+              position: absolute;
+              top: 100%;
+              left: 0;
+              right: 0;
+              background: white;
+              flex-direction: column;
+              padding: 20px;
+              box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+              gap: 15px;
+            }
+            
+            .nav-toggle {
+              display: flex;
+            }
+            
             .header h1 { font-size: 2.5rem; }
             .header .subtitle { font-size: 1.1rem; }
             .section-title { font-size: 2rem; }
             .container { padding: 0 15px; }
+            body { padding-top: 70px; }
           }
         `}</style>
       </head>
       <body>
+        {/* Navigation */}
+        <nav className="navbar">
+          <div className="container">
+            <div className="nav-brand">
+              <a href="/home">Papa Popup</a>
+            </div>
+            <div className="nav-menu">
+              <a href="/pricing" className="nav-link">Pricing</a>
+              <a href="/privacy" className="nav-link">Privacy</a>
+              <a href="#" className="nav-cta">Start Free Trial</a>
+            </div>
+            <div className="nav-toggle">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+        </nav>
+
         {/* Header */}
         <section className="header">
           <div className="container">
             <h1>Papa Popup</h1>
             <p className="subtitle">Smart Popups & Quizzes That Convert Visitors Into Loyal Customers</p>
-            <a href="#pricing" className="cta-button">Start Free Trial</a>
+            <a href="/pricing" className="cta-button">Start Free Trial</a>
           </div>
         </section>
 
