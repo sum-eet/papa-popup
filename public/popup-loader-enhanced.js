@@ -75,7 +75,8 @@
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     });
     saveAnalyticsQueue(queue);
-    console.log('📦 Papa Popup: Analytics event queued:', eventData.eventType);
+    // Reduced analytics logging
+    // console.log('📦 Papa Popup: Analytics event queued:', eventData.eventType);
   }
 
   // Process analytics queue with retry logic
@@ -636,8 +637,8 @@
           index: parseInt(option.dataset.index)
         };
         
-        // Track option selection
-        trackAnalyticsEvent('option_selected', {
+        // Track option selection with console log (safe fallback)
+        console.log('✅ Papa Popup: Option selected:', {
           stepNumber: currentPopupState.currentStep,
           optionValue: selectedOption.value,
           optionText: selectedOption.text,
@@ -645,7 +646,12 @@
         });
         
         // Auto-advance to next step immediately
-        await handleStepNavigation('next', selectedOption);
+        console.log('🚀 Papa Popup: Auto-advancing to next step...');
+        try {
+          await handleStepNavigation('next', selectedOption);
+        } catch (error) {
+          console.error('💥 Papa Popup: Auto-advance failed:', error);
+        }
       });
     });
 
@@ -809,16 +815,75 @@
       // Save updated state
       localStorage.setItem(SESSION_KEY, JSON.stringify(currentPopupState));
 
-      // Re-render popup with new step
-      const overlay = document.getElementById('papa-popup-overlay');
-      if (overlay) {
-        overlay.remove();
-      }
-      renderMultiStepPopup();
+      // Smooth content swap instead of full popup re-render
+      updatePopupContent();
 
     } catch (error) {
       console.error('💥 Papa Popup: Navigation failed:', error);
       alert('Sorry, there was an error. Please try again.');
+    }
+  }
+
+  // Update popup content without full re-render for smooth transitions
+  function updatePopupContent() {
+    console.log('🔄 Papa Popup: Updating content smoothly...');
+    const currentStep = getCurrentStep();
+    if (!currentStep) {
+      console.error('💥 Papa Popup: No current step found');
+      return;
+    }
+
+    let newContent = '';
+    try {
+      newContent = renderStepContent(currentStep);
+    } catch (error) {
+      console.error('💥 Papa Popup: Error rendering step content:', error);
+      return;
+    }
+
+    // Smooth content transition
+    const modal = document.getElementById('papa-popup-modal');
+    if (modal) {
+      console.log('✅ Papa Popup: Found modal, applying smooth transition');
+      // Add transition property
+      modal.style.transition = 'opacity 0.15s ease, transform 0.15s ease';
+      
+      // Add fade-out effect
+      modal.style.opacity = '0.7';
+      modal.style.transform = 'scale(0.98)';
+      
+      setTimeout(() => {
+        try {
+          // Update content
+          modal.innerHTML = newContent;
+          
+          // Re-setup event listeners for new content
+          const currentStepData = getCurrentStep();
+          if (currentStepData) {
+            setupStepEvents(currentStepData.stepType, () => {
+              const overlay = document.getElementById('papa-popup-overlay');
+              if (overlay) overlay.remove();
+            });
+          }
+          
+          // Fade back in
+          modal.style.opacity = '1';
+          modal.style.transform = 'scale(1)';
+          
+          // Remove transition after animation completes
+          setTimeout(() => {
+            modal.style.transition = '';
+          }, 150);
+          
+          console.log('✅ Papa Popup: Content updated smoothly');
+        } catch (error) {
+          console.error('💥 Papa Popup: Error during content update:', error);
+        }
+      }, 150);
+    } else {
+      console.error('💥 Papa Popup: Modal not found, falling back to full render');
+      // Fallback to full render if modal not found
+      renderMultiStepPopup();
     }
   }
 
