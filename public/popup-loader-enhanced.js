@@ -442,7 +442,7 @@
             '<button class="papa-popup-button secondary" id="papa-popup-back">Back</button>' : 
             '<div></div>'
           }
-          <button class="papa-popup-button" id="papa-popup-next" disabled>Next</button>
+          <div></div>
         </div>
       </div>
     `;
@@ -622,7 +622,7 @@
 
     // Option selection
     options.forEach(option => {
-      option.addEventListener('click', () => {
+      option.addEventListener('click', async () => {
         console.log('🔘 Papa Popup: User selected option:', option.textContent.trim());
         
         // Remove selection from all options
@@ -644,32 +644,12 @@
           optionIndex: selectedOption.index
         });
         
-        // Enable next button
-        if (nextBtn) {
-          nextBtn.disabled = false;
-        }
-        
-        console.log('✅ Papa Popup: Option selected and next button enabled');
+        // Auto-advance to next step immediately
+        await handleStepNavigation('next', selectedOption);
       });
     });
 
-    // Next button
-    if (nextBtn) {
-      nextBtn.addEventListener('click', async () => {
-        console.log('➡️ Papa Popup: User clicked Next button');
-        if (selectedOption) {
-          console.log('📝 Papa Popup: Proceeding with selected option:', selectedOption);
-          
-          // Track step completion
-          trackAnalyticsEvent('step_complete', {
-            stepNumber: currentPopupState.currentStep,
-            response: selectedOption
-          });
-          
-          await handleStepNavigation('next', selectedOption);
-        }
-      });
-    }
+    // No Next button for question steps - auto-advance on option selection
 
     // Back button
     if (backBtn) {

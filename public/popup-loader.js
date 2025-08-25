@@ -476,7 +476,7 @@
             '<button class="papa-popup-button" id="papa-popup-back">Back</button>' : 
             '<div></div>'
           }
-          <button class="papa-popup-button" id="papa-popup-next" disabled>Next</button>
+          <div></div>
         </div>
       </div>
     `;
@@ -662,9 +662,9 @@
     
     let selectedOption = null;
 
-    // Option selection
+    // Option selection - Auto-advance to next step
     options.forEach(option => {
-      option.addEventListener('click', () => {
+      option.addEventListener('click', async () => {
         // Remove selection from all options
         options.forEach(opt => opt.classList.remove('selected'));
         
@@ -676,21 +676,12 @@
           index: parseInt(option.dataset.index)
         };
         
-        // Enable next button
-        if (nextBtn) {
-          nextBtn.disabled = false;
-        }
+        // Auto-advance to next step immediately
+        await handleStepNavigation('next', selectedOption);
       });
     });
 
-    // Next button
-    if (nextBtn) {
-      nextBtn.addEventListener('click', async () => {
-        if (selectedOption) {
-          await handleStepNavigation('next', selectedOption);
-        }
-      });
-    }
+    // No Next button for question steps - auto-advance on option selection
 
     // Back button
     if (backBtn) {
@@ -808,16 +799,67 @@
       // Save updated state
       localStorage.setItem(SESSION_KEY, JSON.stringify(currentPopupState));
 
-      // Re-render popup with new step
-      const overlay = document.getElementById('papa-popup-overlay');
-      if (overlay) {
-        overlay.remove();
-      }
-      renderMultiStepPopup();
+      // Smooth content swap instead of full popup re-render
+      updatePopupContent();
 
     } catch (error) {
       console.error('💥 Papa Popup: Navigation failed:', error);
       alert('Sorry, there was an error. Please try again.');
+    }
+  }
+
+  // Update popup content without full re-render for smooth transitions
+  function updatePopupContent() {
+    const currentStep = getCurrentStep();
+    if (!currentStep) {
+      console.error('💥 Papa Popup: No current step found');
+      return;
+    }
+
+    let newContent = '';
+    switch (currentStep.stepType) {
+      case 'QUESTION':
+        newContent = renderQuestionStep(currentStep);
+        break;
+      case 'EMAIL_CAPTURE':
+        newContent = renderEmailStep(currentStep);
+        break;
+      case 'DISCOUNT_REVEAL':
+        newContent = renderDiscountStep(currentStep);
+        break;
+      case 'CONTENT':
+        newContent = renderContentStep(currentStep);
+        break;
+    }
+
+    // Smooth content transition
+    const modal = document.getElementById('papa-popup-modal');
+    if (modal) {
+      // Add transition property
+      modal.style.transition = 'opacity 0.15s ease, transform 0.15s ease';
+      
+      // Add fade-out effect
+      modal.style.opacity = '0.7';
+      modal.style.transform = 'scale(0.98)';
+      
+      setTimeout(() => {
+        // Update content
+        modal.innerHTML = newContent;
+        
+        // Re-setup event listeners for new content
+        setupStepEvents(currentStep);
+        
+        // Fade back in
+        modal.style.opacity = '1';
+        modal.style.transform = 'scale(1)';
+        
+        // Remove transition after animation completes
+        setTimeout(() => {
+          modal.style.transition = '';
+        }, 150);
+        
+        console.log('✅ Papa Popup: Content updated smoothly');
+      }, 150);
     }
   }
 
