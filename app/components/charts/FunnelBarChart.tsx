@@ -204,3 +204,5 @@ export const FunnelBarChart = React.memo(({ data }: FunnelBarChartProps) => {
     </div>
   );
 });
+
+FunnelBarChart.displayName = 'FunnelBarChart';

@@ -173,6 +173,35 @@ export default function FunnelAnalytics() {
     funnelData.overallConversionRate
   ]);
 
+  // Memoize chart data objects to prevent recreation and infinite re-renders
+  const funnelChartData = useMemo(() => ({
+    impressions: stableFunnelData.impressions,
+    step1Completions: stableFunnelData.step1Completions,
+    step2Completions: stableFunnelData.step2Completions,
+    step3Completions: stableFunnelData.step3Completions,
+    emailCompletions: stableFunnelData.emailCompletions
+  }), [
+    stableFunnelData.impressions,
+    stableFunnelData.step1Completions,
+    stableFunnelData.step2Completions,
+    stableFunnelData.step3Completions,
+    stableFunnelData.emailCompletions
+  ]);
+
+  const dropoffChartData = useMemo(() => ({
+    step1Dropoff: stableFunnelData.step1Dropoff,
+    step2Dropoff: stableFunnelData.step2Dropoff,
+    step3Dropoff: stableFunnelData.step3Dropoff,
+    emailDropoff: stableFunnelData.emailDropoff
+  }), [
+    stableFunnelData.step1Dropoff,
+    stableFunnelData.step2Dropoff,
+    stableFunnelData.step3Dropoff,
+    stableFunnelData.emailDropoff
+  ]);
+
+  const conversionChartData = useMemo(() => ([]), []);
+
   // Handle popup filter change - wrapped in useCallback to prevent infinite re-renders
   const handlePopupFilterChange = useCallback((value: string) => {
     // Prevent navigation if the value hasn't actually changed
@@ -329,13 +358,7 @@ export default function FunnelAnalytics() {
               <div style={{ marginTop: '20px' }}>
                 <FunnelBarChart 
                   key="funnel-chart" 
-                  data={{
-                    impressions: stableFunnelData.impressions,
-                    step1Completions: stableFunnelData.step1Completions,
-                    step2Completions: stableFunnelData.step2Completions,
-                    step3Completions: stableFunnelData.step3Completions,
-                    emailCompletions: stableFunnelData.emailCompletions
-                  }} 
+                  data={funnelChartData}
                 />
               </div>
             </div>
@@ -352,7 +375,7 @@ export default function FunnelAnalytics() {
               </Text>
               
               <div style={{ marginTop: '20px' }}>
-                <ConversionLineChart data={[]} />
+                <ConversionLineChart data={conversionChartData} />
               </div>
             </div>
           </Card>
@@ -370,12 +393,7 @@ export default function FunnelAnalytics() {
               <div style={{ marginTop: '20px' }}>
                 <DropoffBarChart 
                   key="dropoff-chart" 
-                  data={{
-                    step1Dropoff: stableFunnelData.step1Dropoff,
-                    step2Dropoff: stableFunnelData.step2Dropoff,
-                    step3Dropoff: stableFunnelData.step3Dropoff,
-                    emailDropoff: stableFunnelData.emailDropoff
-                  }} 
+                  data={dropoffChartData}
                 />
               </div>
             </div>

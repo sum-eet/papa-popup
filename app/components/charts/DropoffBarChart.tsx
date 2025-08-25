@@ -195,3 +195,5 @@ export const DropoffBarChart = React.memo(({ data }: DropoffBarChartProps) => {
     </div>
   );
 });
+
+DropoffBarChart.displayName = 'DropoffBarChart';

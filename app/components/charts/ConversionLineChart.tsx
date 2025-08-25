@@ -188,3 +188,5 @@ export const ConversionLineChart = React.memo(({ data, title = "Conversion Trend
     </div>
   );
 });
+
+ConversionLineChart.displayName = 'ConversionLineChart';
